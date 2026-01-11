@@ -9,10 +9,9 @@ Hogwarts RP sunucuları için geliştirilmiş modern puan sistemi. Profesörler 
 - ✅ Otomatik fallback sistemi (MySQL bağlantı hatası durumunda SQLite)
 - ✅ Async/sync query desteği
 - ✅ Profesör/öğrenci puan sistemi
-- ✅ 4 ev desteği (Gryffindor, Slytherin, Hufflepuff, Ravenclaw)
 - ✅ Multi-gamemode desteği (Helix, DarkRP, Others)
 - ✅ Rate limiting (spam koruması)
-- ✅ Yetki kontrolü (fx_d entegrasyonu veya ULX fallback)
+- ✅ Yetki kontrolü (fx_d entegrasyonu)
 - ✅ Gerçek zamanlı GlobalInt senkronizasyonu
 - ✅ Özel silah ile puan verme/alma
 - ✅ **Anında leaderboard güncellemesi** (puan verildiğinde tabloların otomatik güncellenmesi)
