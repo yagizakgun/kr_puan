@@ -222,6 +222,7 @@ function KrPoints.Database.InitializeSQLite()
 				entity_id TEXT NOT NULL,
 				points INTEGER DEFAULT 0,
 				house TEXT,
+				display_name TEXT,
 				updated_at INTEGER,
 				PRIMARY KEY (entity_type, entity_id)
 			);
@@ -239,6 +240,22 @@ function KrPoints.Database.InitializeSQLite()
 		sql.Query("CREATE INDEX IF NOT EXISTS idx_type_house ON " .. TABLE_NAME .. " (entity_type, house);")
 		
 		print("[KR-PUAN] SQLite table and indexes created.")
+	else
+		-- Check if display_name column exists, if not add it (migration for existing databases)
+		local columns = sql.Query("PRAGMA table_info(" .. TABLE_NAME .. ");")
+		local has_display_name = false
+		if columns then
+			for _, col in ipairs(columns) do
+				if col.name == "display_name" then
+					has_display_name = true
+					break
+				end
+			end
+		end
+		if not has_display_name then
+			print("[KR-PUAN] Adding display_name column to existing table...")
+			sql.Query("ALTER TABLE " .. TABLE_NAME .. " ADD COLUMN display_name TEXT;")
+		end
 	end
 	
 	-- Ensure all houses exist with default 0 points
@@ -264,6 +281,7 @@ function KrPoints.Database.InitializeTables()
 				entity_id VARCHAR(128) NOT NULL,
 				points INT DEFAULT 0,
 				house VARCHAR(32),
+				display_name VARCHAR(128),
 				updated_at INT,
 				PRIMARY KEY (entity_type, entity_id)
 			) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -272,6 +290,9 @@ function KrPoints.Database.InitializeTables()
 		ExecuteQuery(create_query, function(result)
 			if result ~= nil then
 				print("[KR-PUAN] MySQL table created/verified.")
+				
+				-- Add display_name column if it doesn't exist (migration for existing databases)
+				ExecuteQuery("ALTER TABLE " .. TABLE_NAME .. " ADD COLUMN IF NOT EXISTS display_name VARCHAR(128);")
 				
 				-- Create indexes
 				ExecuteQuery("CREATE INDEX IF NOT EXISTS idx_entity_type ON " .. TABLE_NAME .. " (entity_type);")
@@ -385,20 +406,36 @@ function KrPoints.Database.GetStudentPoints(student_name, callback)
 	end
 end
 
-function KrPoints.Database.SetStudentPoints(student_name, points, house, callback)
+function KrPoints.Database.SetStudentPoints(student_name, points, house, callback, display_name)
 	local insert_or_replace = IsMySQL and "INSERT INTO" or "INSERT OR REPLACE INTO"
-	local on_duplicate = IsMySQL and " ON DUPLICATE KEY UPDATE points = VALUES(points), house = VALUES(house), updated_at = VALUES(updated_at)" or ""
+	local on_duplicate = IsMySQL and " ON DUPLICATE KEY UPDATE points = VALUES(points), house = VALUES(house), display_name = VALUES(display_name), updated_at = VALUES(updated_at)" or ""
 	
-	local query_str = insert_or_replace .. " " .. TABLE_NAME .. " (entity_type, entity_id, points, house, updated_at) VALUES (?, ?, ?, ?, ?)" .. on_duplicate .. ";"
+	local query_str = insert_or_replace .. " " .. TABLE_NAME .. " (entity_type, entity_id, points, house, display_name, updated_at) VALUES (?, ?, ?, ?, ?, ?)" .. on_duplicate .. ";"
 	
 	ExecutePreparedQuery(query_str, function(result)
 		if callback then callback(result ~= nil) end
-	end, "student", student_name, points, house, Now())
+	end, "student", student_name, points, house, display_name, Now())
 	
 	-- For sync compatibility
 	if not IsMySQL and not callback then
-		sql.QueryTyped("INSERT OR REPLACE INTO " .. TABLE_NAME .. " (entity_type, entity_id, points, house, updated_at) VALUES ('student', ?, ?, ?, ?);", student_name, points, house, Now())
+		sql.QueryTyped("INSERT OR REPLACE INTO " .. TABLE_NAME .. " (entity_type, entity_id, points, house, display_name, updated_at) VALUES ('student', ?, ?, ?, ?, ?);", student_name, points, house, display_name, Now())
 		return true
+	end
+end
+
+-- Get display name from database (for offline players)
+function KrPoints.Database.GetStudentDisplayName(student_id, callback)
+	local query_str = "SELECT display_name FROM " .. TABLE_NAME .. " WHERE entity_type = 'student' AND entity_id = ?;"
+	
+	ExecutePreparedQuery(query_str, function(result)
+		local name = GetSingleValue(result, "display_name", nil)
+		if callback then callback(name) end
+	end, student_id)
+	
+	-- For sync compatibility
+	if not IsMySQL and not callback then
+		local result = sql.QueryTyped(query_str, student_id)
+		return GetSingleValue(result, "display_name", nil)
 	end
 end
 

@@ -22,10 +22,12 @@ local function GetTopStudentData(ent, house_name, callback)
     KrPoints.Database.GetTopStudents(1, house_key, function(students)
         if students and students[1] then
             local student = students[1]
-            -- Use helper function to convert identifier to display name
-            local display_name = KrPoints.GetDisplayNameFromIdentifier(student.id)
-            local result = display_name .. " | " .. (student.points or 0)
-            if callback then callback(result) end
+            local points = student.points or 0
+            -- Use helper function to convert identifier to display name (with callback for async)
+            KrPoints.GetDisplayNameFromIdentifier(student.id, function(display_name)
+                local result = display_name .. " | " .. points
+                if callback then callback(result) end
+            end)
         else
             if callback then callback("Veri Yok | 0") end
         end

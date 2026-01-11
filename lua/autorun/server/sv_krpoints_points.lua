@@ -123,7 +123,7 @@ local function ModifyStudentPoints(professor_ply, target_ply, amount, is_giving,
 	KrPoints.Database.GetStudentPoints(student_id, function(current_student_points)
 		local new_student_points = current_student_points + delta
 		
-		-- Update student points
+		-- Update student points (also store display_name for offline lookup)
 		KrPoints.Database.SetStudentPoints(student_id, new_student_points, student_house, function()
 			-- Update house points
 			KrPoints.Points.AddToHouse(student_house, delta, function(new_house_points)
@@ -143,14 +143,14 @@ local function ModifyStudentPoints(professor_ply, target_ply, amount, is_giving,
 				
 				if callback then callback(true, result) end
 			end)
-		end)
+		end, student_display_name)
 	end)
 	
 	-- For sync compatibility (SQLite returns immediately)
 	if not KrPoints.Database.IsMySQL() then
 		local current_student_points = KrPoints.Database.GetStudentPoints(student_id)
 		local new_student_points = current_student_points + delta
-		KrPoints.Database.SetStudentPoints(student_id, new_student_points, student_house)
+		KrPoints.Database.SetStudentPoints(student_id, new_student_points, student_house, nil, student_display_name)
 		local new_house_points = KrPoints.Points.AddToHouse(student_house, delta)
 		
 		local action = is_giving and "gave" or "took"

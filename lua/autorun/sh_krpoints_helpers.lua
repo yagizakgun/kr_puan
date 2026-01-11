@@ -59,7 +59,6 @@ function KrPoints.GetStudentIdentifier(ply)
 		local char = ply:GetCharacter()
 		if char and char.GetID then
 			local charId = char:GetID()
-            print("charId: " .. charId)
 			if charId then
 				return tostring(charId)
 			end
@@ -95,8 +94,11 @@ end
 
 -- SERVER ONLY: Convert identifier to display name (handles offline players)
 if SERVER then
-	function KrPoints.GetDisplayNameFromIdentifier(identifier)
-		if not identifier then return "Yok" end
+	function KrPoints.GetDisplayNameFromIdentifier(identifier, callback)
+		if not identifier then 
+			if callback then callback("Yok") end
+			return "Yok" 
+		end
 		
 		-- Try to find online player with this identifier
 		for _, ply in ipairs(player.GetAll()) do
@@ -104,18 +106,37 @@ if SERVER then
 				local ply_id = KrPoints.GetStudentIdentifier(ply)
 				if ply_id == identifier then
 					-- Found the player online, return their display name
-					return KrPoints.GetStudentDisplayName(ply)
+					local name = KrPoints.GetStudentDisplayName(ply)
+					if callback then callback(name) end
+					return name
 				end
 			end
 		end
 		
-		-- Player is offline
-		-- If identifier is numeric (Helix Character ID), show as "Karakter #ID"
-		if tonumber(identifier) then
-			return "Karakter #" .. identifier
+		-- Player is offline - try to get display_name from database
+		if KrPoints.Database and KrPoints.Database.GetStudentDisplayName then
+			-- For async (MySQL) - use callback
+			if callback then
+				KrPoints.Database.GetStudentDisplayName(identifier, function(db_name)
+					if db_name and db_name ~= "" then
+						callback(db_name)
+					else
+						-- Fallback: return identifier as-is
+						callback(identifier)
+					end
+				end)
+				return nil -- async, result will come via callback
+			else
+				-- For sync (SQLite) - direct return
+				local db_name = KrPoints.Database.GetStudentDisplayName(identifier)
+				if db_name and db_name ~= "" then
+					return db_name
+				end
+			end
 		end
 		
-		-- Otherwise return the identifier as-is (already a name)
+		-- Final fallback: return identifier as-is
+		if callback then callback(identifier) end
 		return identifier
 	end
 end
