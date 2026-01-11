@@ -32,7 +32,7 @@ end
 
 function KrPoints.RateLimit.Cleanup()
 	timer.Remove("KrPoints.RateLimitDecay")
-	print("[KR-PUAN] Rate limit cleanup completed.")
+	print("[KR-PUAN] [BİLGİ] Hız limiti temizliği tamamlandı.")
 end
 
 local function DecayOldEntries()
@@ -54,7 +54,7 @@ local function DecayOldEntries()
 	end
 	
 	if removed_count > 0 then
-		print("[KR-PUAN] Rate limit decay: Removed " .. removed_count .. " old entries.")
+		print("[KR-PUAN] [BİLGİ] Hız limiti yenileme: " .. removed_count .. " eski kayıt silindi.")
 	end
 end
 

@@ -3,12 +3,21 @@ KrPoints.Points = KrPoints.Points or {}
 local VALID_HOUSES_LOOKUP = KrPoints.Houses.VALID_HOUSES_LOOKUP
 local VALID_HOUSES = KrPoints.Houses.VALID_HOUSES
 
-local FACTION_TO_HOUSE = {
-	[KrPoints.FactionRavenclaw] = "ravenclaw",
-	[KrPoints.FactionGryffindor] = "gryffindor",
-	[KrPoints.FactionSlytherin] = "slytherin",
-	[KrPoints.FactionHufflepuff] = "hufflepuff",
-}
+-- Faction ismini ev ismine çeviren fonksiyon
+-- Config'deki KrPoints.StudentFactions tablosunu kullanır
+local function GetHouseFromFaction(faction_name)
+	if not KrPoints.StudentFactions then return nil end
+	
+	for house, factions in pairs(KrPoints.StudentFactions) do
+		for _, faction in ipairs(factions) do
+			if faction == faction_name then
+				return house
+			end
+		end
+	end
+	
+	return nil
+end
 
 function KrPoints.Points.SyncGlobalInts(specific_house)
 	if specific_house then
@@ -28,35 +37,35 @@ end
 
 function KrPoints.Points.GetStudentHouse(ply)
 	if not IsValid(ply) or not ply:IsPlayer() then 
-		print("[KR-PUAN] ERROR: Invalid player in GetStudentHouse")
+		print("[KR-PUAN] [HATA] GetStudentHouse fonksiyonunda geçersiz oyuncu")
 		return nil 
 	end
 	
 	local char = ply:GetCharacter()
 	if not char then 
-		print("[KR-PUAN] ERROR: Player has no character: " .. ply:Nick())
+		print("[KR-PUAN] [HATA] Oyuncunun karakteri yok: " .. ply:Nick())
 		return nil 
 	end
 	
 	local fac = ix.faction.indices[char:GetFaction()]
 	if not fac then 
-		print("[KR-PUAN] ERROR: Invalid faction for player: " .. ply:Nick())
+		print("[KR-PUAN] [HATA] Oyuncu için geçersiz faction: " .. ply:Nick())
 		return nil 
 	end
 	
 	local faction_name = fac.name
-	local house = FACTION_TO_HOUSE[faction_name]
+	local house = GetHouseFromFaction(faction_name)
 	if house then
 		return house
 	end
 	
-	print("[KR-PUAN] ERROR: Faction not recognized: " .. tostring(faction_name) .. " for player: " .. ply:Nick())
+	print("[KR-PUAN] [HATA] Faction tanınmadı: " .. tostring(faction_name) .. " - Oyuncu: " .. ply:Nick())
 	return nil
 end
 
 function KrPoints.Points.AddToHouse(house, amount, callback)
 	if not VALID_HOUSES_LOOKUP[house] then 
-		print("[KR-PUAN] ERROR: Invalid house: " .. tostring(house))
+		print("[KR-PUAN] [HATA] Geçersiz ev: " .. tostring(house))
 		if callback then callback(false) end
 		return false 
 	end
@@ -104,9 +113,9 @@ local function ModifyStudentPoints(professor_ply, target_ply, amount, is_giving,
 			
 			KrPoints.Database.SetStudentPoints(student_id, new_student_points, student_house, function()
 				KrPoints.Points.AddToHouse(student_house, delta, function(new_house_points)
-					local action = is_giving and "gave" or "took"
-					local preposition = is_giving and "to" or "from"
-					print("[KR-PUAN] " .. professor_ply:Nick() .. " " .. action .. " " .. amount .. " points " .. preposition .. " " .. student_display_name .. " [ID:" .. student_id .. "] (" .. student_house .. ")")
+					local action = is_giving and "verdi" or "aldı"
+					local preposition = is_giving and "için" or "den"
+					print("[KR-PUAN] [BİLGİ] " .. professor_ply:Nick() .. " " .. amount .. " puan " .. action .. " - " .. student_display_name .. " [ID:" .. student_id .. "] (" .. student_house .. ")")
 					
 					local result = {
 						student_name = student_display_name,
@@ -127,9 +136,8 @@ local function ModifyStudentPoints(professor_ply, target_ply, amount, is_giving,
 		KrPoints.Database.SetStudentPoints(student_id, new_student_points, student_house, nil, student_display_name)
 		local new_house_points = KrPoints.Points.AddToHouse(student_house, delta)
 		
-		local action = is_giving and "gave" or "took"
-		local preposition = is_giving and "to" or "from"
-		print("[KR-PUAN] " .. professor_ply:Nick() .. " " .. action .. " " .. amount .. " points " .. preposition .. " " .. student_display_name .. " [ID:" .. student_id .. "] (" .. student_house .. ")")
+		local action = is_giving and "verdi" or "aldı"
+		print("[KR-PUAN] [BİLGİ] " .. professor_ply:Nick() .. " " .. amount .. " puan " .. action .. " - " .. student_display_name .. " [ID:" .. student_id .. "] (" .. student_house .. ")")
 		
 		return true, {
 			student_name = student_display_name,

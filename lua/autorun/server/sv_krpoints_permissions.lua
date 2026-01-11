@@ -5,7 +5,7 @@ local PROFESSOR_FALLBACK_REQUIRE_ADMIN = KrPoints.Security.PROFESSOR_FALLBACK_RE
 local is_professor_impl
 
 if FX_ClassSystem then
-	print("[KR-PUAN] FX_ClassSystem detected, professor check will use class system.")
+	print("[KR-PUAN] [BİLGİ] FX_ClassSystem tespit edildi, profesör kontrolü sınıf sistemini kullanacak.")
 	is_professor_impl = function(ply)
 		if not IsValid(ply) then return false end
 		return ply:IsSuperAdmin()
@@ -28,19 +28,19 @@ elseif fx_d then
 		return false
 	end
 else
-	print("[KR-PUAN] UYARI: Ders sistemi (fx_d) bulunamadı. Profesör kontrolü çalışmayacak!")
+	print("[KR-PUAN] [UYARI] Ders sistemi (fx_d) bulunamadı. Profesör kontrolü çalışmayacak!")
 	
 	if PROFESSOR_FALLBACK_REQUIRE_ADMIN then
 		is_professor_impl = function(ply) 
 			if not IsValid(ply) then return false end
 			return ply:IsSuperAdmin()
 		end
-		print("[KR-PUAN] GÜVENLİK: Profesör kontrolü için SUPERADMIN yetkisi gerekiyor!")
+		print("[KR-PUAN] [GÜVENLİK] Profesör kontrolü için SUPERADMIN yetkisi gerekiyor!")
 	else
 		is_professor_impl = function(ply) 
 			return IsValid(ply) and ply:IsAdmin() 
 		end
-		print("[KR-PUAN] UYARI: Tüm adminler profesör olarak kabul ediliyor!")
+		print("[KR-PUAN] [UYARI] Tüm adminler profesör olarak kabul ediliyor!")
 	end
 end
 

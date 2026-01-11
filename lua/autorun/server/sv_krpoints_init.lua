@@ -43,7 +43,7 @@ end)
 hook.Add("ShutDown", "KrPoints.Cleanup", function()
 	KrPoints.RateLimit.Cleanup()
 	
-	print("[KR-PUAN] System cleanup completed.")
+	print("[KR-PUAN] [BİLGİ] Sistem temizliği tamamlandı.")
 end)
 
 KrPoints.GetTopStudents = KrPoints.Database.GetTopStudents

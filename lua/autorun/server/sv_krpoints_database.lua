@@ -48,20 +48,20 @@ end
 
 local function ConnectMySQL()
 	if not mysqloo then
-		print("[KR-PUAN] WARNING: MySQLOO module not found! Falling back to SQLite.")
+		print("[KR-PUAN] [UYARI] MySQLOO modülü bulunamadı! SQLite'a geçiliyor.")
 		return false
 	end
 	
 	-- Zaten bağlıysa tekrar bağlanma
 	local existingConn = GetMySQLConnection()
 	if existingConn and existingConn:status() == mysqloo.DATABASE_CONNECTED then
-		print("[KR-PUAN] MySQL already connected, skipping reconnection.")
+		print("[KR-PUAN] [BİLGİ] MySQL zaten bağlı, yeniden bağlanma atlanıyor.")
 		return true
 	end
 	
-	print("[KR-PUAN] Attempting to connect to MySQL...")
-	print("[KR-PUAN] Host: " .. KrPoints.DB.MYSQL_HOST .. ":" .. KrPoints.DB.MYSQL_PORT)
-	print("[KR-PUAN] Database: " .. KrPoints.DB.MYSQL_DATABASE)
+	print("[KR-PUAN] [BİLGİ] MySQL'e bağlanılmaya çalışılıyor...")
+	print("[KR-PUAN] [BİLGİ] Sunucu: " .. KrPoints.DB.MYSQL_HOST .. ":" .. KrPoints.DB.MYSQL_PORT)
+	print("[KR-PUAN] [BİLGİ] Veritabanı: " .. KrPoints.DB.MYSQL_DATABASE)
 	
 	local conn = mysqloo.connect(
 		KrPoints.DB.MYSQL_HOST,
@@ -72,22 +72,22 @@ local function ConnectMySQL()
 	)
 	
 	if not conn then
-		print("[KR-PUAN] ERROR: Failed to create MySQL connection object! Falling back to SQLite.")
+		print("[KR-PUAN] [HATA] MySQL bağlantı nesnesi oluşturulamadı! SQLite'a geçiliyor.")
 		return false
 	end
 	
 	SetMySQLConnection(conn)
 	
 	function conn:onConnected()
-		print("[KR-PUAN] Successfully connected to MySQL database!")
+		print("[KR-PUAN] [BAŞARILI] MySQL veritabanına başarıyla bağlanıldı!")
 		SetIsMySQL(true)
 		SetDatabaseReady(true)
 		KrPoints.Database.InitializeTables()
 	end
 	
 	function conn:onConnectionFailed(err)
-		print("[KR-PUAN] ERROR: MySQL connection failed: " .. tostring(err))
-		print("[KR-PUAN] Falling back to SQLite...")
+		print("[KR-PUAN] [HATA] MySQL bağlantısı başarısız oldu: " .. tostring(err))
+		print("[KR-PUAN] [BİLGİ] SQLite'a geçiliyor...")
 		SetIsMySQL(false)
 		SetMySQLConnection(nil)
 		KrPoints.Database.InitializeSQLite()
@@ -120,14 +120,14 @@ local function EnsureConnection(callback)
 		return
 	end
 	
-	print("[KR-PUAN] MySQL connection lost, attempting to reconnect...")
+	print("[KR-PUAN] [UYARI] MySQL bağlantısı koptu, yeniden bağlanılmaya çalışılıyor...")
 	conn:connect()
 	conn.onConnected = function()
-		print("[KR-PUAN] Reconnected to MySQL successfully!")
+		print("[KR-PUAN] [BAŞARILI] MySQL'e başarıyla yeniden bağlanıldı!")
 		if callback then callback(true) end
 	end
 	conn.onConnectionFailed = function(self, err)
-		print("[KR-PUAN] Reconnection failed: " .. tostring(err))
+		print("[KR-PUAN] [HATA] Yeniden bağlanma başarısız oldu: " .. tostring(err))
 		if callback then callback(false) end
 	end
 end
@@ -137,14 +137,14 @@ local function ExecuteQuery(query_str, callback, ...)
 		-- MySQL (async)
 		EnsureConnection(function(connected)
 			if not connected then
-				print("[KR-PUAN] ERROR: MySQL not connected, query failed!")
+				print("[KR-PUAN] [HATA] MySQL bağlı değil, sorgu başarısız oldu!")
 				if callback then callback(nil) end
 				return
 			end
 			
 			local conn = GetMySQLConnection()
 			if not conn then
-				print("[KR-PUAN] ERROR: MySQL connection object is nil!")
+				print("[KR-PUAN] [HATA] MySQL bağlantı nesnesi nil!")
 				if callback then callback(nil) end
 				return
 			end
@@ -156,8 +156,8 @@ local function ExecuteQuery(query_str, callback, ...)
 			end
 			
 			function query:onError(err, sql)
-				print("[KR-PUAN] MySQL Query Error: " .. tostring(err))
-				print("[KR-PUAN] Query: " .. tostring(sql))
+				print("[KR-PUAN] [HATA] MySQL sorgu hatası: " .. tostring(err))
+				print("[KR-PUAN] [BİLGİ] Sorgu: " .. tostring(sql))
 				if callback then callback(nil) end
 			end
 			
@@ -167,8 +167,8 @@ local function ExecuteQuery(query_str, callback, ...)
 		-- SQLite (sync)
 		local result = sql.Query(query_str)
 		if result == false then
-			print("[KR-PUAN] SQLite Query Error: " .. tostring(sql.LastError()))
-			print("[KR-PUAN] Query: " .. tostring(query_str))
+			print("[KR-PUAN] [HATA] SQLite sorgu hatası: " .. tostring(sql.LastError()))
+			print("[KR-PUAN] [BİLGİ] Sorgu: " .. tostring(query_str))
 		end
 		if callback then callback(result) end
 	end
@@ -180,14 +180,14 @@ local function ExecutePreparedQuery(query_str, callback, ...)
 	if GetIsMySQL() then
 		EnsureConnection(function(connected)
 			if not connected then
-				print("[KR-PUAN] ERROR: MySQL not connected, prepared query failed!")
+				print("[KR-PUAN] [HATA] MySQL bağlı değil, hazırlanan sorgu başarısız oldu!")
 				if callback then callback(nil) end
 				return
 			end
 			
 			local conn = GetMySQLConnection()
 			if not conn then
-				print("[KR-PUAN] ERROR: MySQL connection object is nil!")
+				print("[KR-PUAN] [HATA] MySQL bağlantı nesnesi nil!")
 				if callback then callback(nil) end
 				return
 			end
@@ -211,8 +211,8 @@ local function ExecutePreparedQuery(query_str, callback, ...)
 			end
 			
 			function query:onError(err, sql)
-				print("[KR-PUAN] MySQL Prepared Query Error: " .. tostring(err))
-				print("[KR-PUAN] Query: " .. tostring(sql))
+				print("[KR-PUAN] [HATA] MySQL hazırlanan sorgu hatası: " .. tostring(err))
+				print("[KR-PUAN] [BİLGİ] Sorgu: " .. tostring(sql))
 				if callback then callback(nil) end
 			end
 			
@@ -221,20 +221,20 @@ local function ExecutePreparedQuery(query_str, callback, ...)
 	else
 		local result = sql.QueryTyped(query_str, unpack(params))
 		if result == false then
-			print("[KR-PUAN] SQLite Query Error: " .. tostring(sql.LastError()))
-			print("[KR-PUAN] Query: " .. tostring(query_str))
+			print("[KR-PUAN] [HATA] SQLite sorgu hatası: " .. tostring(sql.LastError()))
+			print("[KR-PUAN] [BİLGİ] Sorgu: " .. tostring(query_str))
 		end
 		if callback then callback(result) end
 	end
 end
 
 function KrPoints.Database.InitializeSQLite()
-	print("[KR-PUAN] Initializing SQLite database...")
+	print("[KR-PUAN] [BİLGİ] SQLite veritabanı başlatılıyor...")
 	SetIsMySQL(false)
 	SetDatabaseReady(false)
 	
 	if not sql.TableExists(TABLE_NAME) then
-		print("[KR-PUAN] Creating SQLite table...")
+		print("[KR-PUAN] [BİLGİ] SQLite tablosu oluşturuluyor...")
 		
 		local create_result = sql.Query([[
 			CREATE TABLE ]] .. TABLE_NAME .. [[ (
@@ -249,7 +249,7 @@ function KrPoints.Database.InitializeSQLite()
 		]])
 		
 		if create_result == false then
-			print("[KR-PUAN] ERROR: Failed to create table: " .. tostring(sql.LastError()))
+			print("[KR-PUAN] [HATA] Tablo oluşturulamadı: " .. tostring(sql.LastError()))
 			return
 		end
 		
@@ -258,7 +258,7 @@ function KrPoints.Database.InitializeSQLite()
 		sql.Query("CREATE INDEX IF NOT EXISTS idx_points ON " .. TABLE_NAME .. " (points DESC);")
 		sql.Query("CREATE INDEX IF NOT EXISTS idx_type_house ON " .. TABLE_NAME .. " (entity_type, house);")
 		
-		print("[KR-PUAN] SQLite table and indexes created.")
+		print("[KR-PUAN] [BAŞARILI] SQLite tablosu ve indeksler oluşturuldu.")
 	else
 		local columns = sql.Query("PRAGMA table_info(" .. TABLE_NAME .. ");")
 		local has_display_name = false
@@ -271,7 +271,7 @@ function KrPoints.Database.InitializeSQLite()
 			end
 		end
 		if not has_display_name then
-			print("[KR-PUAN] Adding display_name column to existing table...")
+			print("[KR-PUAN] [BİLGİ] Mevcut tabloya display_name kolonu ekleniyor...")
 			sql.Query("ALTER TABLE " .. TABLE_NAME .. " ADD COLUMN display_name TEXT;")
 		end
 	end
@@ -284,12 +284,12 @@ function KrPoints.Database.InitializeSQLite()
 	end
 	
 	SetDatabaseReady(true)
-	print("[KR-PUAN] SQLite database ready.")
+	print("[KR-PUAN] [BAŞARILI] SQLite veritabanı hazır.")
 end
 
 function KrPoints.Database.InitializeTables()
 	if GetIsMySQL() then
-		print("[KR-PUAN] Creating MySQL tables...")
+		print("[KR-PUAN] [BİLGİ] MySQL tabloları oluşturuluyor...")
 		
 		local create_query = [[
 			CREATE TABLE IF NOT EXISTS ]] .. TABLE_NAME .. [[ (
@@ -305,7 +305,7 @@ function KrPoints.Database.InitializeTables()
 		
 		ExecuteQuery(create_query, function(result)
 			if result ~= nil then
-				print("[KR-PUAN] MySQL table created/verified.")
+				print("[KR-PUAN] [BAŞARILI] MySQL tablosu oluşturuldu/doğrulandı.")
 				
 				ExecuteQuery("SHOW COLUMNS FROM " .. TABLE_NAME .. " LIKE 'display_name';", function(col_result)
 					if not col_result or #col_result == 0 then
@@ -314,13 +314,13 @@ function KrPoints.Database.InitializeTables()
 						if conn then
 							local query = conn:query("ALTER TABLE " .. TABLE_NAME .. " ADD COLUMN display_name VARCHAR(128);")
 							function query:onSuccess(data)
-								print("[KR-PUAN] Added display_name column.")
+								print("[KR-PUAN] [BAŞARILI] display_name kolonu eklendi.")
 							end
 							function query:onError(err, sql)
 								-- Suppress duplicate column errors
 								if not string.find(err, "Duplicate column name") then
-									print("[KR-PUAN] MySQL Query Error: " .. tostring(err))
-									print("[KR-PUAN] Query: " .. tostring(sql))
+									print("[KR-PUAN] [HATA] MySQL sorgu hatası: " .. tostring(err))
+									print("[KR-PUAN] [BİLGİ] Sorgu: " .. tostring(sql))
 								end
 							end
 							query:start()
@@ -343,13 +343,13 @@ function KrPoints.Database.InitializeTables()
 							if conn then
 								local query = conn:query(idx.def)
 								function query:onSuccess(data)
-									print("[KR-PUAN] Created index: " .. idx.name)
+									print("[KR-PUAN] [BAŞARILI] İndeks oluşturuldu: " .. idx.name)
 								end
 								function query:onError(err, sql)
 									-- Suppress duplicate key errors (index already exists)
 									if not string.find(err, "Duplicate key name") then
-										print("[KR-PUAN] MySQL Query Error: " .. tostring(err))
-										print("[KR-PUAN] Query: " .. tostring(sql))
+										print("[KR-PUAN] [HATA] MySQL sorgu hatası: " .. tostring(err))
+										print("[KR-PUAN] [BİLGİ] Sorgu: " .. tostring(sql))
 									end
 								end
 								query:start()
@@ -364,9 +364,9 @@ function KrPoints.Database.InitializeTables()
 					ExecutePreparedQuery(insert_query, nil, "house", house, Now())
 				end
 				
-				print("[KR-PUAN] MySQL database ready.")
+				print("[KR-PUAN] [BAŞARILI] MySQL veritabanı hazır.")
 			else
-				print("[KR-PUAN] ERROR: Failed to create MySQL table!")
+				print("[KR-PUAN] [HATA] MySQL tablosu oluşturulamadı!")
 			end
 		end)
 	end
@@ -375,17 +375,17 @@ end
 function KrPoints.Database.Initialize()
 	-- Birden fazla kez çağrılmasını engelle
 	if KrPoints.Database._Initialized then
-		print("[KR-PUAN] Database already initialized, skipping...")
+		print("[KR-PUAN] [BİLGİ] Veritabanı zaten başlatılmış, atlanıyor...")
 		return
 	end
 	KrPoints.Database._Initialized = true
 	
-	print("[KR-PUAN] Database Type: " .. string.upper(DB_TYPE))
+	print("[KR-PUAN] [BİLGİ] Veritabanı Tipi: " .. string.upper(DB_TYPE))
 	
 	if DB_TYPE == "mysql" then
 		local success = ConnectMySQL()
 		if not success then
-			print("[KR-PUAN] MySQL connection failed, falling back to SQLite...")
+			print("[KR-PUAN] [UYARI] MySQL bağlantısı başarısız oldu, SQLite'a geçiliyor...")
 			KrPoints.Database.InitializeSQLite()
 		end
 		-- MySQL async olduğundan burada SQLite başlatmıyoruz
@@ -468,8 +468,8 @@ function KrPoints.Database.GetStudentPoints(student_name, callback)
 end
 
 function KrPoints.Database.SetStudentPoints(student_name, points, house, callback, display_name)
-	local insert_or_replace = IsMySQL and "INSERT INTO" or "INSERT OR REPLACE INTO"
-	local on_duplicate = IsMySQL and " ON DUPLICATE KEY UPDATE points = VALUES(points), house = VALUES(house), display_name = VALUES(display_name), updated_at = VALUES(updated_at)" or ""
+	local insert_or_replace = GetIsMySQL() and "INSERT INTO" or "INSERT OR REPLACE INTO"
+	local on_duplicate = GetIsMySQL() and " ON DUPLICATE KEY UPDATE points = VALUES(points), house = VALUES(house), display_name = VALUES(display_name), updated_at = VALUES(updated_at)" or ""
 	
 	local query_str = insert_or_replace .. " " .. TABLE_NAME .. " (entity_type, entity_id, points, house, display_name, updated_at) VALUES (?, ?, ?, ?, ?, ?)" .. on_duplicate .. ";"
 	
@@ -517,19 +517,19 @@ function KrPoints.Database.GetTopStudents(limit, house_filter, callback)
 	if house_filter then
 		house_filter = string.lower(house_filter)
 		if not VALID_HOUSES_LOOKUP[house_filter] then
-			print("[KR-PUAN] SECURITY: Invalid house_filter: " .. tostring(house_filter))
+			print("[KR-PUAN] [GÜVENLİK] Geçersiz house_filter: " .. tostring(house_filter))
 			if callback then callback({}) end
 			return {}
 		end
 		
-		local query_str = "SELECT entity_id as id, points, house, display_name FROM " .. TABLE_NAME .. " WHERE entity_type = 'student' AND house = ? ORDER BY points DESC LIMIT ?;"
+		local query_str = "SELECT entity_id as id, points, house, display_name FROM " .. TABLE_NAME .. " WHERE entity_type = 'student' AND house = ? ORDER BY points DESC LIMIT " .. limit .. ";"
 		
 		ExecutePreparedQuery(query_str, function(result)
 			if callback then callback(result or {}) end
-		end, house_filter, limit)
+		end, house_filter)
 		
 		if not GetIsMySQL() and not callback then
-			return sql.QueryTyped(query_str, house_filter, limit) or {}
+			return sql.QueryTyped(query_str, house_filter) or {}
 		end
 	else
 		local query_str = "SELECT entity_id as id, points, house, display_name FROM " .. TABLE_NAME .. " WHERE entity_type = 'student' ORDER BY points DESC LIMIT " .. limit .. ";"
@@ -560,13 +560,13 @@ function KrPoints.Database.ResetAll(callback)
 	local query_str = "UPDATE " .. TABLE_NAME .. " SET points = 0, updated_at = ?;"
 	
 	ExecutePreparedQuery(query_str, function(result)
-		print("[KR-PUAN] All points reset to zero.")
+		print("[KR-PUAN] [BAŞARILI] Tüm puanlar sıfırlandı.")
 		if callback then callback(result ~= nil) end
 	end, Now())
 	
 	if not GetIsMySQL() and not callback then
 		sql.QueryTyped(query_str, Now())
-		print("[KR-PUAN] All points reset to zero.")
+		print("[KR-PUAN] [BAŞARILI] Tüm puanlar sıfırlandı.")
 		return true
 	end
 end
@@ -575,13 +575,13 @@ function KrPoints.Database.ResetHouses(callback)
 	local query_str = "UPDATE " .. TABLE_NAME .. " SET points = 0, updated_at = ? WHERE entity_type = 'house';"
 	
 	ExecutePreparedQuery(query_str, function(result)
-		print("[KR-PUAN] House points reset to zero.")
+		print("[KR-PUAN] [BAŞARILI] Ev puanları sıfırlandı.")
 		if callback then callback(result ~= nil) end
 	end, Now())
 	
 	if not GetIsMySQL() and not callback then
 		sql.QueryTyped(query_str, Now())
-		print("[KR-PUAN] House points reset to zero.")
+		print("[KR-PUAN] [BAŞARILI] Ev puanları sıfırlandı.")
 		return true
 	end
 end
@@ -590,13 +590,13 @@ function KrPoints.Database.ResetStudents(callback)
 	local query_str = "UPDATE " .. TABLE_NAME .. " SET points = 0, updated_at = ? WHERE entity_type = 'student';"
 	
 	ExecutePreparedQuery(query_str, function(result)
-		print("[KR-PUAN] Student points reset to zero.")
+		print("[KR-PUAN] [BAŞARILI] Öğrenci puanları sıfırlandı.")
 		if callback then callback(result ~= nil) end
 	end, Now())
 	
 	if not GetIsMySQL() and not callback then
 		sql.QueryTyped(query_str, Now())
-		print("[KR-PUAN] Student points reset to zero.")
+		print("[KR-PUAN] [BAŞARILI] Öğrenci puanları sıfırlandı.")
 		return true
 	end
 end
@@ -609,4 +609,4 @@ function KrPoints.Database.IsReady()
 	return GetDatabaseReady()
 end
 
-print("[KR-PUAN] Database module loaded (MySQLOO 9 compatible).")
+print("[KR-PUAN] [BAŞARILI] Veritabanı modülü yüklendi (MySQLOO 9 uyumlu).")

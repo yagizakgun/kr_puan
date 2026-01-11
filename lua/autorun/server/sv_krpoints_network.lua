@@ -16,7 +16,7 @@ local function safe_notify_server(msg, color)
 	if notify_server then
 		notify_server(msg, color)
 	else
-		print("[KR-PUAN] " .. msg)
+		print("[KR-PUAN] [BİLGİ] " .. msg)
 	end
 end
 
@@ -50,12 +50,12 @@ function KrPoints.Network.HandleGivePoints(len, ply)
 	if not IsValid(ply) then return end
 	
 	if not KrPoints.Permissions.IsProfessor(ply) then
-		print("[KR-PUAN] GÜVENLİK: Yetkisiz puan verme girişimi: " .. ply:Nick() .. " [" .. ply:SteamID() .. "]")
+		print("[KR-PUAN] [GÜVENLİK] Yetkisiz puan verme girişimi: " .. ply:Nick() .. " [" .. ply:SteamID() .. "]")
 		return
 	end
 	
 	if not KrPoints.RateLimit.Check(ply) then
-		print("[KR-PUAN] GÜVENLİK: Hız limiti aşıldı: " .. ply:Nick())
+		print("[KR-PUAN] [GÜVENLİK] Hız limiti aşıldı: " .. ply:Nick())
 		return
 	end
 
@@ -64,31 +64,31 @@ function KrPoints.Network.HandleGivePoints(len, ply)
 	local winner_entity = net.ReadEntity()
 
 	if not IsValid(winner_entity) or not winner_entity:IsPlayer() then
-		print("[KR-PUAN] GÜVENLİK: Geçersiz hedef entity: " .. ply:Nick())
+		print("[KR-PUAN] [GÜVENLİK] Geçersiz hedef entity: " .. ply:Nick())
 		return
 	end
 	
 	if winner_entity == ply then
-		print("[KR-PUAN] GÜVENLİK: Kendine puan verme girişimi: " .. ply:Nick())
+		print("[KR-PUAN] [GÜVENLİK] Kendine puan verme girişimi: " .. ply:Nick())
 		ply:ChatPrint("[PUAN] Kendine puan veremezsin!")
 		return
 	end
 
 	local valid, validated_amount = KrPoints.Points.ValidateAmount(points_to_give)
 	if not valid then
-		print("[KR-PUAN] GÜVENLİK: Geçersiz puan değeri: " .. tostring(points_to_give) .. " gönderen: " .. ply:Nick())
+		print("[KR-PUAN] [GÜVENLİK] Geçersiz puan değeri: " .. tostring(points_to_give) .. " - Gönderen: " .. ply:Nick())
 		return
 	end
 	points_to_give = validated_amount
 
 	if point_mode ~= "ver" and point_mode ~= "al" then
-		print("[KR-PUAN] GÜVENLİK: Geçersiz puan modu: " .. tostring(point_mode) .. " gönderen: " .. ply:Nick())
+		print("[KR-PUAN] [GÜVENLİK] Geçersiz puan modu: " .. tostring(point_mode) .. " - Gönderen: " .. ply:Nick())
 		return
 	end
 
 	local function HandleResult(success, result)
 		if not success then
-			print("[KR-PUAN] HATA: " .. tostring(result))
+			print("[KR-PUAN] [HATA] " .. tostring(result))
 			if IsValid(ply) then
 				ply:ChatPrint("[PUAN] HATA: " .. tostring(result))
 			end

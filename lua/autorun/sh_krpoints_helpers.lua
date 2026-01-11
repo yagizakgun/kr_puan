@@ -44,7 +44,7 @@ function KrPoints.GetStudentIdentifier(ply)
 				return tostring(charId)
 			end
 		end
-		print("[KR-PUAN] UYARI: Helix karakter ID bulunamadı, isim kullanılıyor: " .. ply:Nick())
+		print("[KR-PUAN] [UYARI] Helix karakter ID bulunamadı, isim kullanılıyor: " .. ply:Nick())
 	end
 	
 	return ply:Nick()
