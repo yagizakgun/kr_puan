@@ -251,13 +251,32 @@ function KrPoints.Database.InitializeTables()
 			if result ~= nil then
 				print("[KR-PUAN] MySQL table created/verified.")
 				
-				ExecuteQuery("ALTER TABLE " .. TABLE_NAME .. " ADD COLUMN IF NOT EXISTS display_name VARCHAR(128);")
+				ExecuteQuery("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '" .. KrPoints.DB.MYSQL_DATABASE .. "' AND TABLE_NAME = '" .. TABLE_NAME .. "' AND COLUMN_NAME = 'display_name';", function(col_result)
+					if not col_result or #col_result == 0 then
+						ExecuteQuery("ALTER TABLE " .. TABLE_NAME .. " ADD COLUMN display_name VARCHAR(128);", function()
+							print("[KR-PUAN] Added display_name column.")
+						end)
+					end
+				end)
 				
-				ExecuteQuery("CREATE INDEX IF NOT EXISTS idx_entity_type ON " .. TABLE_NAME .. " (entity_type);")
-				ExecuteQuery("CREATE INDEX IF NOT EXISTS idx_house ON " .. TABLE_NAME .. " (house);")
-				ExecuteQuery("CREATE INDEX IF NOT EXISTS idx_points ON " .. TABLE_NAME .. " (points DESC);")
-				ExecuteQuery("CREATE INDEX IF NOT EXISTS idx_type_house ON " .. TABLE_NAME .. " (entity_type, house);")
+				local indexes = {
+					{name = "idx_entity_type", def = "CREATE INDEX idx_entity_type ON " .. TABLE_NAME .. " (entity_type);"},
+					{name = "idx_house", def = "CREATE INDEX idx_house ON " .. TABLE_NAME .. " (house);"},
+					{name = "idx_points", def = "CREATE INDEX idx_points ON " .. TABLE_NAME .. " (points DESC);"},
+					{name = "idx_type_house", def = "CREATE INDEX idx_type_house ON " .. TABLE_NAME .. " (entity_type, house);"}
+				}
 				
+				for _, idx in ipairs(indexes) do
+					ExecuteQuery("SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = '" .. KrPoints.DB.MYSQL_DATABASE .. "' AND TABLE_NAME = '" .. TABLE_NAME .. "' AND INDEX_NAME = '" .. idx.name .. "';", function(idx_result)
+						if not idx_result or #idx_result == 0 then
+							ExecuteQuery(idx.def, function()
+								print("[KR-PUAN] Created index: " .. idx.name)
+							end)
+						end
+					end)
+				end
+				
+				-- Insert house records
 				for _, house in ipairs(VALID_HOUSES) do
 					local insert_query = "INSERT IGNORE INTO " .. TABLE_NAME .. " (entity_type, entity_id, points, updated_at) VALUES (?, ?, 0, ?);"
 					ExecutePreparedQuery(insert_query, nil, "house", house, Now())
