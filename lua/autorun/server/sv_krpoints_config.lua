@@ -1,11 +1,3 @@
--- ============================================
--- KR-PUAN SYSTEM: Server Configuration Module
--- ============================================
--- Sorumluluk: Tüm server-side sabitler ve konfigürasyon
--- Bağımlılıklar: sh_config.lua (shared config'den extend eder)
--- ============================================
-
--- Ensure KrPoints namespace exists (already created by sh_config.lua)
 KrPoints = KrPoints or {}
 
 -- ===== DATABASE CONFIGURATION =====
@@ -42,5 +34,3 @@ KrPoints.Reset.ALLOWED_RANKS = KrPoints.ResetAllowedRanks or {
 	["superadmin"] = true,
 	["owner"] = true,
 }
-
-print("[KR-PUAN] Configuration module loaded.")

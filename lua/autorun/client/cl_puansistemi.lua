@@ -30,7 +30,6 @@ local COLOR_RED = KrPoints.Red
 local COLOR_GREEN = KrPoints.Green
 local COLOR_YELLOW = KrPoints.Yellow
 
--- Modern HUD Colors
 local COLOR_GOLD = Color(212, 175, 55)
 local COLOR_GOLD_DARK = Color(150, 120, 40)
 local COLOR_GIVE_GLOW = Color(80, 200, 120)
@@ -71,7 +70,6 @@ surface.CreateFont("KrPoints_Hint", {
     weight = 500,
 })
 
--- CRITICAL FIX: Define helper functions before use
 local function validate_string_length(str, max_len)
     return str and #str > 0 and #str <= (max_len or 64)
 end
@@ -100,10 +98,8 @@ net.Receive("KrPoints.Notify", function()
 end)
 
 local function DrawGradientBox(x, y, w, h, col_top, col_bot, radius)
-    -- Draw gradient background with rounded corners
     draw_RoundedBox(radius, x, y, w, h, col_bot)
     
-    -- Overlay gradient effect
     for i = 0, h / 2 do
         local alpha = Lerp(i / (h / 2), col_top.a, col_bot.a * 0.5)
         local r = Lerp(i / (h / 2), col_top.r, col_bot.r)
@@ -119,7 +115,6 @@ local function DrawGlowingBorder(x, y, w, h, color, pulse_speed)
     local pulse = math_abs(math_sin(CurTime() * pulse_speed)) * 0.5 + 0.5
     local glow_alpha = 100 + pulse * 80
     
-    -- Outer glow
     for i = 1, 3 do
         local glow_col = Color(color.r, color.g, color.b, glow_alpha / (i * 1.5))
         draw_RoundedBox(12 + i, x - i, y - i, w + i * 2, h + i * 2, glow_col)
@@ -135,7 +130,6 @@ function KrPoints_DrawProfHud()
 
     local scrw, scrh = cached_scrw, cached_scrh
     
-    -- HUD Dimensions
     local box_w = 240
     local box_h = 100
     local box_x = (scrw / 2) - (box_w / 2)
@@ -149,52 +143,40 @@ function KrPoints_DrawProfHud()
     local mode_text = is_give_mode and "VER" or "AL"
     local status_text = is_give_mode and "Verilecek Puan" or "Alınacak Puan"
     
-    -- Animated glow border
     DrawGlowingBorder(box_x, box_y, box_w, box_h, mode_color, 2.5)
     
-    -- Main background with gradient
     DrawGradientBox(box_x, box_y, box_w, box_h, COLOR_BG_GRADIENT_TOP, COLOR_BG_GRADIENT_BOT, 12)
     
-    -- Gold accent line at top
     draw_RoundedBoxEx(12, box_x, box_y, box_w, 3, COLOR_ACCENT_LINE, true, true, false, false)
     
-    -- Title with magical flair
     local title_pulse = math_abs(math_sin(CurTime() * 1.5)) * 30
     local title_color = Color(COLOR_GOLD.r, COLOR_GOLD.g + title_pulse, COLOR_GOLD.b, 255)
     draw_SimpleText("✦ PUAN SİSTEMİ ✦", "KrPoints_Title", box_x + box_w / 2, box_y + 12, title_color, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
     
-    -- Divider line
     surface_SetDrawColor(COLOR_GOLD.r, COLOR_GOLD.g, COLOR_GOLD.b, 60)
     surface_DrawRect(box_x + 20, box_y + 30, box_w - 40, 1)
     
-    -- Mode indicator box
     local mode_box_w = 70
     local mode_box_h = 28
     local mode_box_x = box_x + 15
     local mode_box_y = box_y + 40
     
-    -- Mode background with glow
     local mode_bg_color = Color(mode_color.r, mode_color.g, mode_color.b, 40)
     draw_RoundedBox(6, mode_box_x, mode_box_y, mode_box_w, mode_box_h, mode_bg_color)
     draw_RoundedBox(6, mode_box_x, mode_box_y, mode_box_w, mode_box_h, Color(0, 0, 0, 100))
     
-    -- Mode text
     draw_SimpleText(mode_text, "KrPoints_Mode", mode_box_x + mode_box_w / 2, mode_box_y + mode_box_h / 2, mode_color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     
-    -- Points display with animated pulse
     local points_pulse = 1 + math_abs(math_sin(CurTime() * 3)) * 0.1
     local points_x = box_x + box_w - 50
     local points_y = box_y + 48
     
-    -- Points glow effect
     local points_glow = Color(mode_color.r, mode_color.g, mode_color.b, 80)
     draw_SimpleText(current_points, "KrPoints_Points", points_x + 2, points_y + 2, points_glow, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     draw_SimpleText(current_points, "KrPoints_Points", points_x, points_y, COLOR_WHITE, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     
-    -- Status text
     draw_SimpleText(status_text, "KrPoints_Hint", mode_box_x + mode_box_w + 10, mode_box_y + mode_box_h / 2, COLOR_TEXT_DIM, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
     
-    -- Control hints at bottom
     local hint_y = box_y + box_h - 18
     draw_SimpleText("Sağ Tık: Mod Değiştir", "KrPoints_Hint", box_x + 15, hint_y, Color(150, 150, 160, 180), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
     draw_SimpleText("R: Puan Ayarla", "KrPoints_Hint", box_x + box_w - 15, hint_y, Color(150, 150, 160, 180), TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)

@@ -15,6 +15,8 @@ Hogwarts RP sunucuları için geliştirilmiş modern puan sistemi. Profesörler 
 - ✅ Yetki kontrolü (fx_d entegrasyonu veya ULX fallback)
 - ✅ Gerçek zamanlı GlobalInt senkronizasyonu
 - ✅ Özel silah ile puan verme/alma
+- ✅ **Anında leaderboard güncellemesi** (puan verildiğinde tabloların otomatik güncellenmesi)
+- ✅ **Debounce optimizasyonu** (spam durumunda performans koruması)
 
 ## 🗄️ Veritabanı Desteği
 

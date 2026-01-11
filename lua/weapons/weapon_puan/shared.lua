@@ -1,8 +1,8 @@
 SWEP.Base                   = "weapon_base"
 SWEP.PrintName              = "Puan Kitabı"
 SWEP.ClassName              = "weapon_puankitabi"
-SWEP.Author                 = "KrPoints"
-SWEP.Category               = "KrPoints"
+SWEP.Author                 = "Kronax"
+SWEP.Category               = "Kronax"
 SWEP.Instructions           = "Puan verip - almanıza yarar"
 SWEP.Spawnable              = true
 SWEP.AdminOnly              = false

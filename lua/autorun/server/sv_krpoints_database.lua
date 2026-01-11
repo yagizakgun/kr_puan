@@ -1,36 +1,14 @@
--- ============================================
--- KR-PUAN SYSTEM: Database Layer Module (MySQLOO 9 Compatible)
--- ============================================
--- Sorumluluk: Tüm SQL operasyonları ve veritabanı yönetimi
--- Bağımlılıklar: sv_krpoints_config.lua
--- ============================================
--- Supports both SQLite (default) and MySQL (MySQLOO 9)
--- Modern tek tablo yapısı:
---   kr_points (
---     entity_type TEXT/VARCHAR,    -- 'house' veya 'student'
---     entity_id TEXT/VARCHAR,      -- ev adı veya öğrenci adı
---     points INTEGER/INT,          -- puan değeri
---     house TEXT/VARCHAR,          -- öğrencinin evi (sadece student için)
---     updated_at INTEGER/INT,      -- son güncelleme timestamp
---     PRIMARY KEY (entity_type, entity_id)
---   )
--- ============================================
-
 KrPoints.Database = KrPoints.Database or {}
 
--- Shorthand references
 local TABLE_NAME = KrPoints.DB.TABLE_NAME
 local VALID_HOUSES = KrPoints.Houses.VALID_HOUSES
 local VALID_HOUSES_LOOKUP = KrPoints.Houses.VALID_HOUSES_LOOKUP
 local DB_TYPE = KrPoints.DB.TYPE
 
--- Database connection instance
 local MySQLConnection = nil
 local IsMySQL = false
 local DatabaseReady = false
 
--- ===== HELPER FUNCTIONS =====
--- Extract single value from SQL result (reduces repetitive nil checking)
 local function GetSingleValue(result, field, default)
 	if result and result ~= false and result[1] then
 		return result[1][field]
@@ -38,12 +16,10 @@ local function GetSingleValue(result, field, default)
 	return default
 end
 
--- Get current timestamp
 local function Now()
 	return os.time()
 end
 
--- ===== MYSQLOO CONNECTION MANAGEMENT =====
 local function ConnectMySQL()
 	if not mysqloo then
 		print("[KR-PUAN] WARNING: MySQLOO module not found! Falling back to SQLite.")
@@ -67,7 +43,6 @@ local function ConnectMySQL()
 		return false
 	end
 	
-	-- Connection success callback
 	function MySQLConnection:onConnected()
 		print("[KR-PUAN] Successfully connected to MySQL database!")
 		IsMySQL = true
@@ -75,7 +50,6 @@ local function ConnectMySQL()
 		KrPoints.Database.InitializeTables()
 	end
 	
-	-- Connection error callback
 	function MySQLConnection:onConnectionFailed(err)
 		print("[KR-PUAN] ERROR: MySQL connection failed: " .. tostring(err))
 		print("[KR-PUAN] Falling back to SQLite...")
@@ -84,18 +58,15 @@ local function ConnectMySQL()
 		KrPoints.Database.InitializeSQLite()
 	end
 	
-	-- Start the connection
 	MySQLConnection:connect()
 	return true
 end
 
--- Check if MySQL connection is alive
 local function IsConnectionAlive()
 	if not IsMySQL or not MySQLConnection then return false end
 	return MySQLConnection:status() == mysqloo.DATABASE_CONNECTED
 end
 
--- Reconnect to MySQL if connection is lost
 local function EnsureConnection(callback)
 	if not IsMySQL then
 		if callback then callback(true) end
@@ -119,8 +90,6 @@ local function EnsureConnection(callback)
 	end
 end
 
--- ===== QUERY ABSTRACTION LAYER =====
--- Execute a query (handles both SQLite and MySQL)
 local function ExecuteQuery(query_str, callback, ...)
 	if IsMySQL then
 		-- MySQL (async)
@@ -156,12 +125,10 @@ local function ExecuteQuery(query_str, callback, ...)
 	end
 end
 
--- Execute a prepared query (handles both SQLite and MySQL)
 local function ExecutePreparedQuery(query_str, callback, ...)
 	local params = {...}
 	
 	if IsMySQL then
-		-- MySQL prepared statement
 		EnsureConnection(function(connected)
 			if not connected then
 				print("[KR-PUAN] ERROR: MySQL not connected, prepared query failed!")
@@ -171,7 +138,6 @@ local function ExecutePreparedQuery(query_str, callback, ...)
 			
 			local query = MySQLConnection:prepare(query_str)
 			
-			-- Set parameters
 			for i, param in ipairs(params) do
 				if type(param) == "number" then
 					query:setNumber(i, param)
@@ -197,7 +163,6 @@ local function ExecutePreparedQuery(query_str, callback, ...)
 			query:start()
 		end)
 	else
-		-- SQLite with sql.QueryTyped
 		local result = sql.QueryTyped(query_str, unpack(params))
 		if result == false then
 			print("[KR-PUAN] SQLite Query Error: " .. tostring(sql.LastError()))
@@ -207,7 +172,6 @@ local function ExecutePreparedQuery(query_str, callback, ...)
 	end
 end
 
--- ===== INITIALIZATION =====
 function KrPoints.Database.InitializeSQLite()
 	print("[KR-PUAN] Initializing SQLite database...")
 	IsMySQL = false
@@ -233,7 +197,6 @@ function KrPoints.Database.InitializeSQLite()
 			return
 		end
 		
-		-- Create indexes
 		sql.Query("CREATE INDEX IF NOT EXISTS idx_entity_type ON " .. TABLE_NAME .. " (entity_type);")
 		sql.Query("CREATE INDEX IF NOT EXISTS idx_house ON " .. TABLE_NAME .. " (house);")
 		sql.Query("CREATE INDEX IF NOT EXISTS idx_points ON " .. TABLE_NAME .. " (points DESC);")
@@ -241,7 +204,6 @@ function KrPoints.Database.InitializeSQLite()
 		
 		print("[KR-PUAN] SQLite table and indexes created.")
 	else
-		-- Check if display_name column exists, if not add it (migration for existing databases)
 		local columns = sql.Query("PRAGMA table_info(" .. TABLE_NAME .. ");")
 		local has_display_name = false
 		if columns then
@@ -258,7 +220,6 @@ function KrPoints.Database.InitializeSQLite()
 		end
 	end
 	
-	-- Ensure all houses exist with default 0 points
 	for _, house in ipairs(VALID_HOUSES) do
 		sql.QueryTyped(
 			"INSERT OR IGNORE INTO " .. TABLE_NAME .. " (entity_type, entity_id, points, updated_at) VALUES ('house', ?, 0, ?);",
@@ -274,7 +235,6 @@ function KrPoints.Database.InitializeTables()
 	if IsMySQL then
 		print("[KR-PUAN] Creating MySQL tables...")
 		
-		-- MySQL table creation
 		local create_query = [[
 			CREATE TABLE IF NOT EXISTS ]] .. TABLE_NAME .. [[ (
 				entity_type VARCHAR(32) NOT NULL,
@@ -291,16 +251,13 @@ function KrPoints.Database.InitializeTables()
 			if result ~= nil then
 				print("[KR-PUAN] MySQL table created/verified.")
 				
-				-- Add display_name column if it doesn't exist (migration for existing databases)
 				ExecuteQuery("ALTER TABLE " .. TABLE_NAME .. " ADD COLUMN IF NOT EXISTS display_name VARCHAR(128);")
 				
-				-- Create indexes
 				ExecuteQuery("CREATE INDEX IF NOT EXISTS idx_entity_type ON " .. TABLE_NAME .. " (entity_type);")
 				ExecuteQuery("CREATE INDEX IF NOT EXISTS idx_house ON " .. TABLE_NAME .. " (house);")
 				ExecuteQuery("CREATE INDEX IF NOT EXISTS idx_points ON " .. TABLE_NAME .. " (points DESC);")
 				ExecuteQuery("CREATE INDEX IF NOT EXISTS idx_type_house ON " .. TABLE_NAME .. " (entity_type, house);")
 				
-				-- Ensure all houses exist
 				for _, house in ipairs(VALID_HOUSES) do
 					local insert_query = "INSERT IGNORE INTO " .. TABLE_NAME .. " (entity_type, entity_id, points, updated_at) VALUES (?, ?, 0, ?);"
 					ExecutePreparedQuery(insert_query, nil, "house", house, Now())
@@ -327,7 +284,6 @@ function KrPoints.Database.Initialize()
 	end
 end
 
--- ===== HOUSE POINTS OPERATIONS =====
 function KrPoints.Database.GetHousePoints(house, callback)
 	if not VALID_HOUSES_LOOKUP[house] then
 		if callback then callback(nil) end
@@ -341,7 +297,6 @@ function KrPoints.Database.GetHousePoints(house, callback)
 		if callback then callback(points) end
 	end, "house", house)
 	
-	-- For sync compatibility (SQLite)
 	if not IsMySQL and not callback then
 		local result = sql.QueryTyped(query_str, "house", house)
 		return tonumber(GetSingleValue(result, "points", 0)) or 0
@@ -360,7 +315,6 @@ function KrPoints.Database.SetHousePoints(house, points, callback)
 		if callback then callback(result ~= nil) end
 	end, points, Now(), house)
 	
-	-- For sync compatibility
 	if not IsMySQL and not callback then
 		sql.QueryTyped(query_str, points, Now(), house)
 		return true
@@ -373,24 +327,20 @@ function KrPoints.Database.AddHousePoints(house, amount, callback)
 		return false
 	end
 	
-	-- Atomic increment with single query
 	local query_str = "UPDATE " .. TABLE_NAME .. " SET points = points + ?, updated_at = ? WHERE entity_type = 'house' AND entity_id = ?;"
 	
 	ExecutePreparedQuery(query_str, function(result)
-		-- Get updated points
 		KrPoints.Database.GetHousePoints(house, function(new_points)
 			if callback then callback(new_points) end
 		end)
 	end, amount, Now(), house)
 	
-	-- For sync compatibility
 	if not IsMySQL and not callback then
 		sql.QueryTyped(query_str, amount, Now(), house)
 		return KrPoints.Database.GetHousePoints(house)
 	end
 end
 
--- ===== STUDENT POINTS OPERATIONS =====
 function KrPoints.Database.GetStudentPoints(student_name, callback)
 	local query_str = "SELECT points FROM " .. TABLE_NAME .. " WHERE entity_type = 'student' AND entity_id = ?;"
 	
@@ -399,7 +349,6 @@ function KrPoints.Database.GetStudentPoints(student_name, callback)
 		if callback then callback(points) end
 	end, student_name)
 	
-	-- For sync compatibility
 	if not IsMySQL and not callback then
 		local result = sql.QueryTyped(query_str, student_name)
 		return tonumber(GetSingleValue(result, "points", 0)) or 0
@@ -416,14 +365,12 @@ function KrPoints.Database.SetStudentPoints(student_name, points, house, callbac
 		if callback then callback(result ~= nil) end
 	end, "student", student_name, points, house, display_name, Now())
 	
-	-- For sync compatibility
 	if not IsMySQL and not callback then
 		sql.QueryTyped("INSERT OR REPLACE INTO " .. TABLE_NAME .. " (entity_type, entity_id, points, house, display_name, updated_at) VALUES ('student', ?, ?, ?, ?, ?);", student_name, points, house, display_name, Now())
 		return true
 	end
 end
 
--- Get display name from database (for offline players)
 function KrPoints.Database.GetStudentDisplayName(student_id, callback)
 	local query_str = "SELECT display_name FROM " .. TABLE_NAME .. " WHERE entity_type = 'student' AND entity_id = ?;"
 	
@@ -431,8 +378,7 @@ function KrPoints.Database.GetStudentDisplayName(student_id, callback)
 		local name = GetSingleValue(result, "display_name", nil)
 		if callback then callback(name) end
 	end, student_id)
-	
-	-- For sync compatibility
+		
 	if not IsMySQL and not callback then
 		local result = sql.QueryTyped(query_str, student_id)
 		return GetSingleValue(result, "display_name", nil)
@@ -447,14 +393,12 @@ function KrPoints.Database.GetStudentHouse(student_name, callback)
 		if callback then callback(house) end
 	end, student_name)
 	
-	-- For sync compatibility
 	if not IsMySQL and not callback then
 		local result = sql.QueryTyped(query_str, student_name)
 		return GetSingleValue(result, "house", nil)
 	end
 end
 
--- ===== QUERY OPERATIONS =====
 function KrPoints.Database.GetTopStudents(limit, house_filter, callback)
 	limit = math.Clamp(tonumber(limit) or 10, 1, 100)
 	
@@ -472,7 +416,6 @@ function KrPoints.Database.GetTopStudents(limit, house_filter, callback)
 			if callback then callback(result or {}) end
 		end, house_filter, limit)
 		
-		-- For sync compatibility
 		if not IsMySQL and not callback then
 			return sql.QueryTyped(query_str, house_filter, limit) or {}
 		end
@@ -483,7 +426,6 @@ function KrPoints.Database.GetTopStudents(limit, house_filter, callback)
 			if callback then callback(result or {}) end
 		end)
 		
-		-- For sync compatibility
 		if not IsMySQL and not callback then
 			return sql.Query(query_str) or {}
 		end
@@ -497,13 +439,11 @@ function KrPoints.Database.GetAllHousePoints(callback)
 		if callback then callback(result or {}) end
 	end)
 	
-	-- For sync compatibility
 	if not IsMySQL and not callback then
 		return sql.Query(query_str) or {}
 	end
 end
 
--- ===== RESET OPERATIONS =====
 function KrPoints.Database.ResetAll(callback)
 	local query_str = "UPDATE " .. TABLE_NAME .. " SET points = 0, updated_at = ?;"
 	
@@ -512,7 +452,6 @@ function KrPoints.Database.ResetAll(callback)
 		if callback then callback(result ~= nil) end
 	end, Now())
 	
-	-- For sync compatibility
 	if not IsMySQL and not callback then
 		sql.QueryTyped(query_str, Now())
 		print("[KR-PUAN] All points reset to zero.")
@@ -528,7 +467,6 @@ function KrPoints.Database.ResetHouses(callback)
 		if callback then callback(result ~= nil) end
 	end, Now())
 	
-	-- For sync compatibility
 	if not IsMySQL and not callback then
 		sql.QueryTyped(query_str, Now())
 		print("[KR-PUAN] House points reset to zero.")
@@ -544,7 +482,6 @@ function KrPoints.Database.ResetStudents(callback)
 		if callback then callback(result ~= nil) end
 	end, Now())
 	
-	-- For sync compatibility
 	if not IsMySQL and not callback then
 		sql.QueryTyped(query_str, Now())
 		print("[KR-PUAN] Student points reset to zero.")
@@ -552,7 +489,6 @@ function KrPoints.Database.ResetStudents(callback)
 	end
 end
 
--- ===== UTILITY FUNCTIONS =====
 function KrPoints.Database.IsMySQL()
 	return IsMySQL
 end
