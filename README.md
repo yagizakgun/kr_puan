@@ -18,7 +18,7 @@ Hogwarts RP sunucuları için geliştirilmiş modern puan sistemi. Profesörler 
 fx_puan/
 ├── lua/
 │   ├── autorun/
-│   │   ├── sh_config.lua                    # Paylaşılan konfigürasyon
+│   │   ├── sh_config.lua                    # Paylaşılan konfigürasyon + Utility API
 │   │   ├── client/
 │   │   │   └── cl_puansistemi.lua           # Client HUD ve UI
 │   │   └── server/
@@ -29,6 +29,11 @@ fx_puan/
 │   │       ├── sv_krpoints_permissions.lua  # Yetki kontrolleri
 │   │       ├── sv_krpoints_points.lua       # İş mantığı
 │   │       └── sv_krpoints_ratelimit.lua    # Spam koruması
+│   ├── entities/
+│   │   └── kr_puan_tablo/                   # Puan tablosu entity
+│   │       ├── cl_init.lua                  # Client render (3D2D)
+│   │       ├── init.lua                     # Server logic
+│   │       └── shared.lua                   # Shared config + NetworkVars
 │   └── weapons/
 │       └── weapon_puan/                     # Puan verme silahı
 │           ├── cl_init.lua
@@ -131,10 +136,30 @@ KrPoints.Database.ResetHouses()
 KrPoints.Database.ResetStudents()
 ```
 
-### Client-Side Erişim (GlobalInt)
+### Shared Utility Fonksiyonları (Client & Server)
 
 ```lua
--- Her iki tarafta da çalışır (cache'li)
+-- Tüm ev puanlarını al (GlobalInt üzerinden)
+local points = KrPoints.GetAllHousePoints()
+-- Dönen: {Gryffindor = 150, Hufflepuff = 120, Ravenclaw = 100, Slytherin = 80}
+
+-- Lider evi bul
+local house, score = KrPoints.GetLeadingHouse()
+-- Dönen: "Gryffindor", 150
+
+-- Tek evin puanını al
+local points = KrPoints.GetHousePoints("Gryffindor")
+-- Dönen: 150
+
+-- Ev listesi ve key mapping
+KrPoints.HouseList  -- {"Gryffindor", "Hufflepuff", "Ravenclaw", "Slytherin"}
+KrPoints.HouseKeys  -- {Gryffindor = "gryffindor", Hufflepuff = "hufflepuff", ...}
+```
+
+### Client-Side Erişim (GlobalInt - Low Level)
+
+```lua
+-- Direkt GlobalInt erişimi (alternatif yöntem)
 local gryffindor = GetGlobalInt("puan_gryffindor", 0)
 local slytherin = GetGlobalInt("puan_slytherin", 0)
 local hufflepuff = GetGlobalInt("puan_hufflepuff", 0)
@@ -173,6 +198,31 @@ KrPoints.FactionGryffindor = "Gryffindor Öğrencisi"
 KrPoints.FactionSlytherin = "Slytherin Öğrencisi"
 KrPoints.FactionHufflepuff = "Hufflepuff Öğrencisi"
 ```
+
+## 🏆 Puan Tablosu Entity
+
+`kr_puan_tablo` entity'si spawn edilebilir bir 3D puan tablosudur:
+
+### Özellikler
+- Tüm evlerin puanlarını bar grafik olarak gösterir
+- Her evin en iyi öğrencisini listeler
+- Lider evi vurgular
+- 30 saniyede bir otomatik güncellenir
+- Smooth animasyonlu puan barları
+
+### Spawn
+```lua
+-- Console veya Lua ile spawn
+local ent = ents.Create("kr_puan_tablo")
+ent:SetPos(Vector(0, 0, 0))
+ent:SetAngles(Angle(0, 0, 0))
+ent:Spawn()
+```
+
+### Spawn Menüsü
+**Entities → KR-PUAN → Puan Tablosu**
+
+---
 
 ## 🎮 Silah Kullanımı
 
@@ -245,11 +295,5 @@ end)
 - **fx_d** (opsiyonel - profesör tespiti için)
 - **ULX/ULib** (opsiyonel - fallback yetki sistemi)
 
-## 📄 Lisans
-
-Bu proje özel kullanım içindir.
-
----
-
-**Geliştirici:** FX Team  
+**Geliştirici:** Kronax
 **Versiyon:** 2.0 (Modern Database)
