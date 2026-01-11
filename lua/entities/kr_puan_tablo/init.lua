@@ -20,11 +20,19 @@ local function UpdateLeaderboard(ent)
                 if students and students[1] then
                     local student = students[1]
                     local points = student.points or 0
-                    KrPoints.GetDisplayNameFromIdentifier(student.id, function(display_name)
+                    
+                    -- Use display_name from query if available, otherwise lookup
+                    if student.display_name and student.display_name ~= "" then
                         if IsValid(ent) and setter then
-                            setter(ent, display_name .. " | " .. points)
+                            setter(ent, student.display_name .. " | " .. points)
                         end
-                    end)
+                    else
+                        KrPoints.GetDisplayNameFromIdentifier(student.id, function(display_name)
+                            if IsValid(ent) and setter then
+                                setter(ent, display_name .. " | " .. points)
+                            end
+                        end)
+                    end
                 else
                     if setter then
                         setter(ent, "Veri Yok | 0")
@@ -36,8 +44,14 @@ local function UpdateLeaderboard(ent)
                 local students = KrPoints.Database.GetTopStudents(1, house_key)
                 if students and students[1] then
                     local student = students[1]
-                    local display_name = KrPoints.GetDisplayNameFromIdentifier(student.id)
-                    setter(ent, display_name .. " | " .. (student.points or 0))
+                    local points = student.points or 0
+                    
+                    -- Use display_name from query if available, otherwise lookup
+                    local display_name = (student.display_name and student.display_name ~= "") 
+                        and student.display_name 
+                        or KrPoints.GetDisplayNameFromIdentifier(student.id)
+                    
+                    setter(ent, display_name .. " | " .. points)
                 else
                     setter(ent, "Veri Yok | 0")
                 end

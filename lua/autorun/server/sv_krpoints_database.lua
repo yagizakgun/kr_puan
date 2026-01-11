@@ -5,9 +5,35 @@ local VALID_HOUSES = KrPoints.Houses.VALID_HOUSES
 local VALID_HOUSES_LOOKUP = KrPoints.Houses.VALID_HOUSES_LOOKUP
 local DB_TYPE = KrPoints.DB.TYPE
 
-local MySQLConnection = nil
-local IsMySQL = false
-local DatabaseReady = false
+-- Değişkenleri KrPoints tablosunda sakla ki birden fazla yüklemede kaybolmasın
+KrPoints.Database._MySQLConnection = KrPoints.Database._MySQLConnection or nil
+KrPoints.Database._IsMySQL = KrPoints.Database._IsMySQL or false
+KrPoints.Database._DatabaseReady = KrPoints.Database._DatabaseReady or false
+KrPoints.Database._Initialized = KrPoints.Database._Initialized or false
+
+local function GetMySQLConnection()
+	return KrPoints.Database._MySQLConnection
+end
+
+local function SetMySQLConnection(conn)
+	KrPoints.Database._MySQLConnection = conn
+end
+
+local function GetIsMySQL()
+	return KrPoints.Database._IsMySQL
+end
+
+local function SetIsMySQL(value)
+	KrPoints.Database._IsMySQL = value
+end
+
+local function GetDatabaseReady()
+	return KrPoints.Database._DatabaseReady
+end
+
+local function SetDatabaseReady(value)
+	KrPoints.Database._DatabaseReady = value
+end
 
 local function GetSingleValue(result, field, default)
 	if result and result ~= false and result[1] then
@@ -26,11 +52,18 @@ local function ConnectMySQL()
 		return false
 	end
 	
+	-- Zaten bağlıysa tekrar bağlanma
+	local existingConn = GetMySQLConnection()
+	if existingConn and existingConn:status() == mysqloo.DATABASE_CONNECTED then
+		print("[KR-PUAN] MySQL already connected, skipping reconnection.")
+		return true
+	end
+	
 	print("[KR-PUAN] Attempting to connect to MySQL...")
 	print("[KR-PUAN] Host: " .. KrPoints.DB.MYSQL_HOST .. ":" .. KrPoints.DB.MYSQL_PORT)
 	print("[KR-PUAN] Database: " .. KrPoints.DB.MYSQL_DATABASE)
 	
-	MySQLConnection = mysqloo.connect(
+	local conn = mysqloo.connect(
 		KrPoints.DB.MYSQL_HOST,
 		KrPoints.DB.MYSQL_USER,
 		KrPoints.DB.MYSQL_PASSWORD,
@@ -38,37 +71,40 @@ local function ConnectMySQL()
 		KrPoints.DB.MYSQL_PORT
 	)
 	
-	if not MySQLConnection then
+	if not conn then
 		print("[KR-PUAN] ERROR: Failed to create MySQL connection object! Falling back to SQLite.")
 		return false
 	end
 	
-	function MySQLConnection:onConnected()
+	SetMySQLConnection(conn)
+	
+	function conn:onConnected()
 		print("[KR-PUAN] Successfully connected to MySQL database!")
-		IsMySQL = true
-		DatabaseReady = true
+		SetIsMySQL(true)
+		SetDatabaseReady(true)
 		KrPoints.Database.InitializeTables()
 	end
 	
-	function MySQLConnection:onConnectionFailed(err)
+	function conn:onConnectionFailed(err)
 		print("[KR-PUAN] ERROR: MySQL connection failed: " .. tostring(err))
 		print("[KR-PUAN] Falling back to SQLite...")
-		IsMySQL = false
-		MySQLConnection = nil
+		SetIsMySQL(false)
+		SetMySQLConnection(nil)
 		KrPoints.Database.InitializeSQLite()
 	end
 	
-	MySQLConnection:connect()
+	conn:connect()
 	return true
 end
 
 local function IsConnectionAlive()
-	if not IsMySQL or not MySQLConnection then return false end
-	return MySQLConnection:status() == mysqloo.DATABASE_CONNECTED
+	local conn = GetMySQLConnection()
+	if not GetIsMySQL() or not conn then return false end
+	return conn:status() == mysqloo.DATABASE_CONNECTED
 end
 
 local function EnsureConnection(callback)
-	if not IsMySQL then
+	if not GetIsMySQL() then
 		if callback then callback(true) end
 		return
 	end
@@ -78,20 +114,26 @@ local function EnsureConnection(callback)
 		return
 	end
 	
+	local conn = GetMySQLConnection()
+	if not conn then
+		if callback then callback(false) end
+		return
+	end
+	
 	print("[KR-PUAN] MySQL connection lost, attempting to reconnect...")
-	MySQLConnection:connect()
-	MySQLConnection.onConnected = function()
+	conn:connect()
+	conn.onConnected = function()
 		print("[KR-PUAN] Reconnected to MySQL successfully!")
 		if callback then callback(true) end
 	end
-	MySQLConnection.onConnectionFailed = function(self, err)
+	conn.onConnectionFailed = function(self, err)
 		print("[KR-PUAN] Reconnection failed: " .. tostring(err))
 		if callback then callback(false) end
 	end
 end
 
 local function ExecuteQuery(query_str, callback, ...)
-	if IsMySQL then
+	if GetIsMySQL() then
 		-- MySQL (async)
 		EnsureConnection(function(connected)
 			if not connected then
@@ -100,7 +142,14 @@ local function ExecuteQuery(query_str, callback, ...)
 				return
 			end
 			
-			local query = MySQLConnection:query(query_str)
+			local conn = GetMySQLConnection()
+			if not conn then
+				print("[KR-PUAN] ERROR: MySQL connection object is nil!")
+				if callback then callback(nil) end
+				return
+			end
+			
+			local query = conn:query(query_str)
 			
 			function query:onSuccess(data)
 				if callback then callback(data) end
@@ -128,7 +177,7 @@ end
 local function ExecutePreparedQuery(query_str, callback, ...)
 	local params = {...}
 	
-	if IsMySQL then
+	if GetIsMySQL() then
 		EnsureConnection(function(connected)
 			if not connected then
 				print("[KR-PUAN] ERROR: MySQL not connected, prepared query failed!")
@@ -136,7 +185,14 @@ local function ExecutePreparedQuery(query_str, callback, ...)
 				return
 			end
 			
-			local query = MySQLConnection:prepare(query_str)
+			local conn = GetMySQLConnection()
+			if not conn then
+				print("[KR-PUAN] ERROR: MySQL connection object is nil!")
+				if callback then callback(nil) end
+				return
+			end
+			
+			local query = conn:prepare(query_str)
 			
 			for i, param in ipairs(params) do
 				if type(param) == "number" then
@@ -174,8 +230,8 @@ end
 
 function KrPoints.Database.InitializeSQLite()
 	print("[KR-PUAN] Initializing SQLite database...")
-	IsMySQL = false
-	DatabaseReady = false
+	SetIsMySQL(false)
+	SetDatabaseReady(false)
 	
 	if not sql.TableExists(TABLE_NAME) then
 		print("[KR-PUAN] Creating SQLite table...")
@@ -227,12 +283,12 @@ function KrPoints.Database.InitializeSQLite()
 		)
 	end
 	
-	DatabaseReady = true
+	SetDatabaseReady(true)
 	print("[KR-PUAN] SQLite database ready.")
 end
 
 function KrPoints.Database.InitializeTables()
-	if IsMySQL then
+	if GetIsMySQL() then
 		print("[KR-PUAN] Creating MySQL tables...")
 		
 		local create_query = [[
@@ -254,18 +310,21 @@ function KrPoints.Database.InitializeTables()
 				ExecuteQuery("SHOW COLUMNS FROM " .. TABLE_NAME .. " LIKE 'display_name';", function(col_result)
 					if not col_result or #col_result == 0 then
 						-- Column doesn't exist, try to add it
-						local query = MySQLConnection:query("ALTER TABLE " .. TABLE_NAME .. " ADD COLUMN display_name VARCHAR(128);")
-						function query:onSuccess(data)
-							print("[KR-PUAN] Added display_name column.")
-						end
-						function query:onError(err, sql)
-							-- Suppress duplicate column errors
-							if not string.find(err, "Duplicate column name") then
-								print("[KR-PUAN] MySQL Query Error: " .. tostring(err))
-								print("[KR-PUAN] Query: " .. tostring(sql))
+						local conn = GetMySQLConnection()
+						if conn then
+							local query = conn:query("ALTER TABLE " .. TABLE_NAME .. " ADD COLUMN display_name VARCHAR(128);")
+							function query:onSuccess(data)
+								print("[KR-PUAN] Added display_name column.")
 							end
+							function query:onError(err, sql)
+								-- Suppress duplicate column errors
+								if not string.find(err, "Duplicate column name") then
+									print("[KR-PUAN] MySQL Query Error: " .. tostring(err))
+									print("[KR-PUAN] Query: " .. tostring(sql))
+								end
+							end
+							query:start()
 						end
-						query:start()
 					end
 				end)
 				
@@ -280,18 +339,21 @@ function KrPoints.Database.InitializeTables()
 					ExecuteQuery("SHOW INDEX FROM " .. TABLE_NAME .. " WHERE Key_name = '" .. idx.name .. "';", function(idx_result)
 						if not idx_result or #idx_result == 0 then
 							-- Index doesn't exist, try to create it
-							local query = MySQLConnection:query(idx.def)
-							function query:onSuccess(data)
-								print("[KR-PUAN] Created index: " .. idx.name)
-							end
-							function query:onError(err, sql)
-								-- Suppress duplicate key errors (index already exists)
-								if not string.find(err, "Duplicate key name") then
-									print("[KR-PUAN] MySQL Query Error: " .. tostring(err))
-									print("[KR-PUAN] Query: " .. tostring(sql))
+							local conn = GetMySQLConnection()
+							if conn then
+								local query = conn:query(idx.def)
+								function query:onSuccess(data)
+									print("[KR-PUAN] Created index: " .. idx.name)
 								end
+								function query:onError(err, sql)
+									-- Suppress duplicate key errors (index already exists)
+									if not string.find(err, "Duplicate key name") then
+										print("[KR-PUAN] MySQL Query Error: " .. tostring(err))
+										print("[KR-PUAN] Query: " .. tostring(sql))
+									end
+								end
+								query:start()
 							end
-							query:start()
 						end
 					end)
 				end
@@ -311,13 +373,24 @@ function KrPoints.Database.InitializeTables()
 end
 
 function KrPoints.Database.Initialize()
+	-- Birden fazla kez çağrılmasını engelle
+	if KrPoints.Database._Initialized then
+		print("[KR-PUAN] Database already initialized, skipping...")
+		return
+	end
+	KrPoints.Database._Initialized = true
+	
 	print("[KR-PUAN] Database Type: " .. string.upper(DB_TYPE))
 	
 	if DB_TYPE == "mysql" then
 		local success = ConnectMySQL()
 		if not success then
+			print("[KR-PUAN] MySQL connection failed, falling back to SQLite...")
 			KrPoints.Database.InitializeSQLite()
 		end
+		-- MySQL async olduğundan burada SQLite başlatmıyoruz
+		-- Bağlantı başarılı olduğunda onConnected callback'i InitializeTables'ı çağıracak
+		-- Bağlantı başarısız olduğunda onConnectionFailed callback'i InitializeSQLite'ı çağıracak
 	else
 		KrPoints.Database.InitializeSQLite()
 	end
@@ -336,7 +409,7 @@ function KrPoints.Database.GetHousePoints(house, callback)
 		if callback then callback(points) end
 	end, "house", house)
 	
-	if not IsMySQL and not callback then
+	if not GetIsMySQL() and not callback then
 		local result = sql.QueryTyped(query_str, "house", house)
 		return tonumber(GetSingleValue(result, "points", 0)) or 0
 	end
@@ -354,7 +427,7 @@ function KrPoints.Database.SetHousePoints(house, points, callback)
 		if callback then callback(result ~= nil) end
 	end, points, Now(), house)
 	
-	if not IsMySQL and not callback then
+	if not GetIsMySQL() and not callback then
 		sql.QueryTyped(query_str, points, Now(), house)
 		return true
 	end
@@ -374,7 +447,7 @@ function KrPoints.Database.AddHousePoints(house, amount, callback)
 		end)
 	end, amount, Now(), house)
 	
-	if not IsMySQL and not callback then
+	if not GetIsMySQL() and not callback then
 		sql.QueryTyped(query_str, amount, Now(), house)
 		return KrPoints.Database.GetHousePoints(house)
 	end
@@ -388,7 +461,7 @@ function KrPoints.Database.GetStudentPoints(student_name, callback)
 		if callback then callback(points) end
 	end, student_name)
 	
-	if not IsMySQL and not callback then
+	if not GetIsMySQL() and not callback then
 		local result = sql.QueryTyped(query_str, student_name)
 		return tonumber(GetSingleValue(result, "points", 0)) or 0
 	end
@@ -404,7 +477,7 @@ function KrPoints.Database.SetStudentPoints(student_name, points, house, callbac
 		if callback then callback(result ~= nil) end
 	end, "student", student_name, points, house, display_name, Now())
 	
-	if not IsMySQL and not callback then
+	if not GetIsMySQL() and not callback then
 		sql.QueryTyped("INSERT OR REPLACE INTO " .. TABLE_NAME .. " (entity_type, entity_id, points, house, display_name, updated_at) VALUES ('student', ?, ?, ?, ?, ?);", student_name, points, house, display_name, Now())
 		return true
 	end
@@ -418,7 +491,7 @@ function KrPoints.Database.GetStudentDisplayName(student_id, callback)
 		if callback then callback(name) end
 	end, student_id)
 		
-	if not IsMySQL and not callback then
+	if not GetIsMySQL() and not callback then
 		local result = sql.QueryTyped(query_str, student_id)
 		return GetSingleValue(result, "display_name", nil)
 	end
@@ -432,7 +505,7 @@ function KrPoints.Database.GetStudentHouse(student_name, callback)
 		if callback then callback(house) end
 	end, student_name)
 	
-	if not IsMySQL and not callback then
+	if not GetIsMySQL() and not callback then
 		local result = sql.QueryTyped(query_str, student_name)
 		return GetSingleValue(result, "house", nil)
 	end
@@ -449,23 +522,23 @@ function KrPoints.Database.GetTopStudents(limit, house_filter, callback)
 			return {}
 		end
 		
-		local query_str = "SELECT entity_id as id, points, house FROM " .. TABLE_NAME .. " WHERE entity_type = 'student' AND house = ? ORDER BY points DESC LIMIT ?;"
+		local query_str = "SELECT entity_id as id, points, house, display_name FROM " .. TABLE_NAME .. " WHERE entity_type = 'student' AND house = ? ORDER BY points DESC LIMIT ?;"
 		
 		ExecutePreparedQuery(query_str, function(result)
 			if callback then callback(result or {}) end
 		end, house_filter, limit)
 		
-		if not IsMySQL and not callback then
+		if not GetIsMySQL() and not callback then
 			return sql.QueryTyped(query_str, house_filter, limit) or {}
 		end
 	else
-		local query_str = "SELECT entity_id as id, points, house FROM " .. TABLE_NAME .. " WHERE entity_type = 'student' ORDER BY points DESC LIMIT " .. limit .. ";"
+		local query_str = "SELECT entity_id as id, points, house, display_name FROM " .. TABLE_NAME .. " WHERE entity_type = 'student' ORDER BY points DESC LIMIT " .. limit .. ";"
 		
 		ExecuteQuery(query_str, function(result)
 			if callback then callback(result or {}) end
 		end)
 		
-		if not IsMySQL and not callback then
+		if not GetIsMySQL() and not callback then
 			return sql.Query(query_str) or {}
 		end
 	end
@@ -478,7 +551,7 @@ function KrPoints.Database.GetAllHousePoints(callback)
 		if callback then callback(result or {}) end
 	end)
 	
-	if not IsMySQL and not callback then
+	if not GetIsMySQL() and not callback then
 		return sql.Query(query_str) or {}
 	end
 end
@@ -491,7 +564,7 @@ function KrPoints.Database.ResetAll(callback)
 		if callback then callback(result ~= nil) end
 	end, Now())
 	
-	if not IsMySQL and not callback then
+	if not GetIsMySQL() and not callback then
 		sql.QueryTyped(query_str, Now())
 		print("[KR-PUAN] All points reset to zero.")
 		return true
@@ -506,7 +579,7 @@ function KrPoints.Database.ResetHouses(callback)
 		if callback then callback(result ~= nil) end
 	end, Now())
 	
-	if not IsMySQL and not callback then
+	if not GetIsMySQL() and not callback then
 		sql.QueryTyped(query_str, Now())
 		print("[KR-PUAN] House points reset to zero.")
 		return true
@@ -521,7 +594,7 @@ function KrPoints.Database.ResetStudents(callback)
 		if callback then callback(result ~= nil) end
 	end, Now())
 	
-	if not IsMySQL and not callback then
+	if not GetIsMySQL() and not callback then
 		sql.QueryTyped(query_str, Now())
 		print("[KR-PUAN] Student points reset to zero.")
 		return true
@@ -529,11 +602,11 @@ function KrPoints.Database.ResetStudents(callback)
 end
 
 function KrPoints.Database.IsMySQL()
-	return IsMySQL
+	return GetIsMySQL()
 end
 
 function KrPoints.Database.IsReady()
-	return DatabaseReady
+	return GetDatabaseReady()
 end
 
 print("[KR-PUAN] Database module loaded (MySQLOO 9 compatible).")
