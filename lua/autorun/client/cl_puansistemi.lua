@@ -40,34 +40,63 @@ local COLOR_ACCENT_LINE = Color(212, 175, 55, 180)
 local COLOR_TEXT_DIM = Color(180, 180, 190)
 
 surface.CreateFont("KrPoints_Font", {
-    font = "Roboto",
-    size = 23,
-    weight = 1000,
+    font = "Crimson Text", -- Roboto yerine bunu kullanıyoruz
+    size = 22,
+    weight = 600,
+    extended = true,
+    antialias = true,
 })
 
 surface.CreateFont("KrPoints_Title", {
-    font = "Trebuchet MS",
-    size = 18,
+    font = "Cinzel Decorative", -- Dosya adı tam böyle olmalı
+    size = 24, -- 18 biraz küçüktü, 24 daha okunaklı olur
     weight = 700,
-    italic = true,
+    italic = false, -- Italic bazen okunabilirliği düşürür, düz daha asil durur
+    extended = true, -- TÜRKÇE KARAKTERLER (İ, ş, ğ) İÇİN ŞART!
+    antialias = true,
+    shadow = true, -- Hafif gölge ekler, büyü hissi verir
 })
-
 surface.CreateFont("KrPoints_Mode", {
-    font = "Roboto",
-    size = 28,
-    weight = 900,
+    font = "Crimson Text", -- Veya 'EB Garamond'
+    size = 30, -- Kutunun içini doldurması için
+    weight = 800, -- Kalın olması lazım ki mühür gibi dursun
+    extended = true,
+    antialias = true,
 })
 
 surface.CreateFont("KrPoints_Points", {
-    font = "Roboto",
-    size = 42,
-    weight = 900,
+    font = "IM Fell English", -- Eski kitap baskısı havası verir
+    size = 50, -- Sayı odak noktası olduğu için iyice büyüttük
+    weight = 800,
+    extended = true,
+    antialias = true,
 })
 
 surface.CreateFont("KrPoints_Hint", {
+    font = "Crimson Text", -- Küçük boyutta bile okunaklıdır
+    size = 16, -- 13 çok küçük kalabilir, 16 ideal
+    weight = 600,
+    extended = true,
+    antialias = true,
+    shadow = false, -- Küçük yazıda gölge bozar, kapattık
+})
+
+surface.CreateFont("KrPoints_Notification_Title", {
     font = "Roboto",
-    size = 13,
-    weight = 500,
+    size = 32,
+    weight = 900,
+})
+
+surface.CreateFont("KrPoints_Notification_Subtitle", {
+    font = "Roboto",
+    size = 20,
+    weight = 600,
+})
+
+surface.CreateFont("KrPoints_Notification_Points", {
+    font = "Roboto",
+    size = 48,
+    weight = 900,
 })
 
 local function validate_string_length(str, max_len)
@@ -151,7 +180,7 @@ function KrPoints_DrawProfHud()
     
     local title_pulse = math_abs(math_sin(CurTime() * 1.5)) * 30
     local title_color = Color(COLOR_GOLD.r, COLOR_GOLD.g + title_pulse, COLOR_GOLD.b, 255)
-    draw_SimpleText("✦ PUAN SİSTEMİ ✦", "KrPoints_Title", box_x + box_w / 2, box_y + 12, title_color, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+    draw_SimpleText("PUAN SİSTEMİ", "KrPoints_Title", box_x + box_w / 2, box_y + 12, title_color, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
     
     surface_SetDrawColor(COLOR_GOLD.r, COLOR_GOLD.g, COLOR_GOLD.b, 60)
     surface_DrawRect(box_x + 20, box_y + 30, box_w - 40, 1)
@@ -193,6 +222,8 @@ local house_data = {
 
 local notification_queue = {}
 local is_notification_active = false
+local notification_start_time = 0
+local notification_duration = 3
 
 local function validate_house(house)
     if not house or house == "" then return false end
@@ -206,23 +237,160 @@ end
 
 local function draw_notification_hud(data)
     local scrw, scrh = cached_scrw, cached_scrh
-    local box_w, box_h = scrw * 0.3, scrh * 0.1
-    local box_x = (scrw / 2) - (box_w / 2)
-    local box_y = scrh * 0.01
-
-    draw_RoundedBox(20, box_x, box_y, box_w, box_h, COLOR_BG_DARKER)
-
-    if data.logo then
-        surface_SetDrawColor(255, 255, 255, 255)
-        surface_SetMaterial(data.logo)
-        surface_DrawTexturedRect(box_x + scrw * 0.005, 10, 90, 80)
+    
+    -- Animasyon hesaplamaları
+    local elapsed = CurTime() - notification_start_time
+    local progress = math.Clamp(elapsed / notification_duration, 0, 1)
+    
+    -- Slide-in animasyonu (ilk 0.3 saniye)
+    local slide_progress = math.Clamp(elapsed / 0.3, 0, 1)
+    slide_progress = 1 - math.pow(1 - slide_progress, 3) -- Ease-out cubic
+    
+    -- Fade-out animasyonu (son 0.4 saniye)
+    local fade_alpha = 1
+    if progress > 0.87 then
+        fade_alpha = 1 - ((progress - 0.87) / 0.13)
     end
-
-    local text_x = box_x + scrw * 0.08
-    draw_SimpleText(data.house .. " Hanesi Puan " .. data.action_text, "KrPoints_Font", text_x, scrh * 0.015, color_white)
-    draw_SimpleText(data.student, "KrPoints_Font", box_x + scrw * 0.1, scrh * 0.05, color_white)
-    draw_SimpleText(data.given_text .. " Puan: ", "KrPoints_Font", box_x + scrw * 0.1, scrh * 0.08, data.prof_color)
-    draw_SimpleText(data.points, "KrPoints_Font", box_x + scrw * 0.195, scrh * 0.08, color_white)
+    
+    -- Boyutlar
+    local box_w = scrw * 0.45
+    local box_h = 160
+    local box_x = (scrw / 2) - (box_w / 2)
+    local target_y = scrh * 0.05
+    local box_y = target_y - (1 - slide_progress) * 200
+    
+    -- Logo boyutları
+    local logo_size = 120
+    local logo_padding = 15
+    
+    -- Glow efekti
+    local pulse = math_abs(math_sin(CurTime() * 2)) * 0.3 + 0.7
+    local glow_color = Color(data.color.r, data.color.g, data.color.b, 80 * pulse * fade_alpha)
+    
+    for i = 1, 4 do
+        local glow_offset = i * 2
+        local glow_alpha = (80 / i) * pulse * fade_alpha
+        draw_RoundedBox(16 + i, box_x - glow_offset, box_y - glow_offset, 
+            box_w + glow_offset * 2, box_h + glow_offset * 2, 
+            Color(data.color.r, data.color.g, data.color.b, glow_alpha))
+    end
+    
+    -- Arka plan gradient
+    DrawGradientBox(box_x, box_y, box_w, box_h, 
+        Color(20, 20, 30, 245 * fade_alpha), 
+        Color(10, 10, 15, 255 * fade_alpha), 16)
+    
+    -- Üst kenar vurgusu
+    local accent_color = Color(data.color.r, data.color.g, data.color.b, 220 * fade_alpha)
+    draw_RoundedBoxEx(16, box_x, box_y, box_w, 5, accent_color, true, true, false, false)
+    
+    -- Logo arka plan kutusu
+    local logo_box_x = box_x + logo_padding
+    local logo_box_y = box_y + (box_h / 2) - (logo_size / 2)
+    
+    local logo_bg_pulse = math_abs(math_sin(CurTime() * 1.5)) * 0.2 + 0.8
+    local logo_bg_color = Color(data.color.r * 0.3, data.color.g * 0.3, data.color.b * 0.3, 180 * fade_alpha * logo_bg_pulse)
+    draw_RoundedBox(12, logo_box_x - 5, logo_box_y - 5, logo_size + 10, logo_size + 10, logo_bg_color)
+    
+    -- Logo border
+    local logo_border_color = Color(data.color.r, data.color.g, data.color.b, 255 * fade_alpha)
+    for i = 1, 2 do
+        draw_RoundedBox(12, logo_box_x - 5 - i, logo_box_y - 5 - i, 
+            logo_size + 10 + i * 2, logo_size + 10 + i * 2, 
+            Color(logo_border_color.r, logo_border_color.g, logo_border_color.b, (60 / i) * fade_alpha))
+    end
+    
+    -- Logo çizimi
+    if data.logo then
+        surface_SetDrawColor(255, 255, 255, 255 * fade_alpha)
+        surface_SetMaterial(data.logo)
+        surface_DrawTexturedRect(logo_box_x, logo_box_y, logo_size, logo_size)
+    end
+    
+    -- Text alanı başlangıcı
+    local text_start_x = logo_box_x + logo_size + 25
+    local text_area_w = box_w - (logo_size + logo_padding * 2 + 25) - 20
+    
+    -- Ev ismi ve aksiyon
+    local title_y = box_y + 20
+    local title_text = data.house .. " " .. data.action_text
+    local title_color = Color(data.color.r, data.color.g, data.color.b, 255 * fade_alpha)
+    
+    -- Title glow efekti
+    local title_glow_offset = math_sin(CurTime() * 3) * 1
+    draw_SimpleText(title_text, "KrPoints_Notification_Title", 
+        text_start_x + title_glow_offset, title_y + title_glow_offset, 
+        Color(title_color.r * 0.5, title_color.g * 0.5, title_color.b * 0.5, 120 * fade_alpha), 
+        TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+    
+    draw_SimpleText(title_text, "KrPoints_Notification_Title", 
+        text_start_x, title_y, title_color, 
+        TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+    
+    -- Ayırıcı çizgi
+    local divider_y = title_y + 38
+    local divider_progress = math.Clamp((elapsed - 0.2) / 0.3, 0, 1)
+    local divider_w = text_area_w * divider_progress
+    surface_SetDrawColor(data.color.r, data.color.g, data.color.b, 100 * fade_alpha)
+    surface_DrawRect(text_start_x, divider_y, divider_w, 2)
+    
+    -- Öğrenci ismi
+    local student_y = divider_y + 12
+    local student_color = Color(220, 220, 230, 255 * fade_alpha)
+    draw_SimpleText("Öğrenci: " .. data.student, "KrPoints_Notification_Subtitle", 
+        text_start_x, student_y, student_color, 
+        TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+    
+    -- Puan kutsu
+    local points_y = student_y + 32
+    local points_box_w = 120
+    local points_box_h = 50
+    local points_box_x = text_start_x
+    
+    -- Puan kutusu arka plan
+    local points_pulse = math_abs(math_sin(CurTime() * 2.5)) * 0.15 + 0.85
+    local points_box_color = Color(data.prof_color.r * 0.4, data.prof_color.g * 0.4, data.prof_color.b * 0.4, 200 * fade_alpha * points_pulse)
+    draw_RoundedBox(8, points_box_x, points_y, points_box_w, points_box_h, points_box_color)
+    
+    -- Puan border
+    draw_RoundedBox(8, points_box_x, points_y, points_box_w, 2, 
+        Color(data.prof_color.r, data.prof_color.g, data.prof_color.b, 255 * fade_alpha))
+    
+    -- Puan değeri
+    local points_text = (data.points > 0 and "+" or "") .. data.points
+    local points_text_color = Color(255, 255, 255, 255 * fade_alpha)
+    
+    -- Puan glow
+    local points_glow = math_abs(math_sin(CurTime() * 3)) * 2
+    draw_SimpleText(points_text, "KrPoints_Notification_Points", 
+        points_box_x + points_box_w / 2 + points_glow, points_y + points_box_h / 2 + points_glow, 
+        Color(data.prof_color.r, data.prof_color.g, data.prof_color.b, 100 * fade_alpha), 
+        TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    
+    draw_SimpleText(points_text, "KrPoints_Notification_Points", 
+        points_box_x + points_box_w / 2, points_y + points_box_h / 2, 
+        points_text_color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    
+    -- "PUAN" etiketi
+    local label_x = points_box_x + points_box_w + 10
+    local label_y = points_y + 8
+    draw_SimpleText(data.given_text, "KrPoints_Notification_Subtitle", 
+        label_x, label_y, Color(180, 180, 190, 255 * fade_alpha), 
+        TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+    
+    draw_SimpleText("PUAN", "KrPoints_Notification_Subtitle", 
+        label_x, label_y + 24, Color(data.prof_color.r, data.prof_color.g, data.prof_color.b, 255 * fade_alpha), 
+        TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+    
+    -- Alt progress bar
+    local progress_bar_h = 4
+    local progress_bar_y = box_y + box_h - progress_bar_h
+    local progress_bar_w = box_w * (1 - progress)
+    
+    surface_SetDrawColor(data.color.r, data.color.g, data.color.b, 180 * fade_alpha)
+    draw_RoundedBoxEx(0, box_x, progress_bar_y, progress_bar_w, progress_bar_h, 
+        Color(data.color.r, data.color.g, data.color.b, 180 * fade_alpha), 
+        false, false, true, true)
 end
 
 local function process_notification_queue()
@@ -235,6 +403,8 @@ local function process_notification_queue()
 
     local current_notification = table.remove(notification_queue, 1)
     is_notification_active = true
+    notification_start_time = CurTime()
+    notification_duration = KrPoints.HudDuration or 3
 
     hook.Add("HUDPaint", "KrPoints.NotificationHud", function()
         if not current_notification then
@@ -244,9 +414,8 @@ local function process_notification_queue()
         draw_notification_hud(current_notification)
     end)
 
-    local display_time = KrPoints.HudDuration or 3
     timer.Remove("KrPoints.NotificationTimer")
-    timer.Create("KrPoints.NotificationTimer", display_time, 1, function()
+    timer.Create("KrPoints.NotificationTimer", notification_duration, 1, function()
         process_notification_queue()
     end)
 end

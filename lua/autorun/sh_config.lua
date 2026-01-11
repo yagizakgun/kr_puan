@@ -131,3 +131,9 @@ if CLIENT then
 	KrPoints.HUD.OrangeColor = Color(255, 128, 0)
 	KrPoints.HUD.PinkColor = Color(255, 0, 128)
 end
+
+if SERVER then
+    resource.AddFile("resource/fonts/cinzel_decorative.ttf") -- Dosya ismin neyse o
+    resource.AddFile("resource/fonts/crimson_text.ttf")
+    resource.AddFile("resource/fonts/im_fell_english.ttf")
+end
