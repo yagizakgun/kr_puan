@@ -251,11 +251,21 @@ function KrPoints.Database.InitializeTables()
 			if result ~= nil then
 				print("[KR-PUAN] MySQL table created/verified.")
 				
-				ExecuteQuery("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '" .. KrPoints.DB.MYSQL_DATABASE .. "' AND TABLE_NAME = '" .. TABLE_NAME .. "' AND COLUMN_NAME = 'display_name';", function(col_result)
+				ExecuteQuery("SHOW COLUMNS FROM " .. TABLE_NAME .. " LIKE 'display_name';", function(col_result)
 					if not col_result or #col_result == 0 then
-						ExecuteQuery("ALTER TABLE " .. TABLE_NAME .. " ADD COLUMN display_name VARCHAR(128);", function()
+						-- Column doesn't exist, try to add it
+						local query = MySQLConnection:query("ALTER TABLE " .. TABLE_NAME .. " ADD COLUMN display_name VARCHAR(128);")
+						function query:onSuccess(data)
 							print("[KR-PUAN] Added display_name column.")
-						end)
+						end
+						function query:onError(err, sql)
+							-- Suppress duplicate column errors
+							if not string.find(err, "Duplicate column name") then
+								print("[KR-PUAN] MySQL Query Error: " .. tostring(err))
+								print("[KR-PUAN] Query: " .. tostring(sql))
+							end
+						end
+						query:start()
 					end
 				end)
 				
@@ -267,11 +277,21 @@ function KrPoints.Database.InitializeTables()
 				}
 				
 				for _, idx in ipairs(indexes) do
-					ExecuteQuery("SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = '" .. KrPoints.DB.MYSQL_DATABASE .. "' AND TABLE_NAME = '" .. TABLE_NAME .. "' AND INDEX_NAME = '" .. idx.name .. "';", function(idx_result)
+					ExecuteQuery("SHOW INDEX FROM " .. TABLE_NAME .. " WHERE Key_name = '" .. idx.name .. "';", function(idx_result)
 						if not idx_result or #idx_result == 0 then
-							ExecuteQuery(idx.def, function()
+							-- Index doesn't exist, try to create it
+							local query = MySQLConnection:query(idx.def)
+							function query:onSuccess(data)
 								print("[KR-PUAN] Created index: " .. idx.name)
-							end)
+							end
+							function query:onError(err, sql)
+								-- Suppress duplicate key errors (index already exists)
+								if not string.find(err, "Duplicate key name") then
+									print("[KR-PUAN] MySQL Query Error: " .. tostring(err))
+									print("[KR-PUAN] Query: " .. tostring(sql))
+								end
+							end
+							query:start()
 						end
 					end)
 				end
