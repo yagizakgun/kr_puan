@@ -96,11 +96,9 @@ local function DrawTextWithGlow(text, font, x, y, color, glow_intensity, align_h
     glow_offset = glow_offset or 2
     glow_intensity = glow_intensity or 80
     
-    -- Glow
     local glow_col = Color(color.r * 0.5, color.g * 0.5, color.b * 0.5, glow_intensity)
     draw_SimpleText(text, font, x + glow_offset, y + glow_offset, glow_col, align_h, align_v)
     
-    -- Ana text
     draw_SimpleText(text, font, x, y, color, align_h, align_v)
 end
 

@@ -3,8 +3,6 @@ KrPoints.Points = KrPoints.Points or {}
 local VALID_HOUSES_LOOKUP = KrPoints.Houses.VALID_HOUSES_LOOKUP
 local VALID_HOUSES = KrPoints.Houses.VALID_HOUSES
 
--- Faction ismini ev ismine çeviren fonksiyon
--- Config'deki KrPoints.StudentFactions tablosunu kullanır
 local function GetHouseFromFaction(faction_name)
 	if not KrPoints.StudentFactions then return nil end
 	
@@ -84,23 +82,22 @@ function KrPoints.Points.GetHousePoints(house)
 	return GetGlobalInt("puan_" .. house, 0)
 end
 
--- ===== STUDENT POINTS OPERATIONS =====
 local function ModifyStudentPoints(professor_ply, target_ply, amount, is_giving, callback)
 	if not IsValid(professor_ply) or not IsValid(target_ply) then
-		if callback then callback(false, "Invalid player") end
-		return false, "Invalid player"
+		if callback then callback(false, "Geçersiz oyuncu") end
+		return false, "Geçersiz oyuncu"
 	end
 	
 	local student_house = KrPoints.Points.GetStudentHouse(target_ply)
 	if not student_house then
-		if callback then callback(false, "Target is not a student") end
-		return false, "Target is not a student"
+		if callback then callback(false, "Hedef bir öğrenci değil") end
+		return false, "Hedef bir öğrenci değil"
 	end
 	
 	local student_id = KrPoints.GetStudentIdentifier(target_ply)
 	if not student_id then
-		if callback then callback(false, "Could not get student identifier") end
-		return false, "Could not get student identifier"
+		if callback then callback(false, "Öğrenci kimliği alınamadı") end
+		return false, "Öğrenci kimliği alınamadı"
 	end
 	
 	local student_display_name = KrPoints.GetStudentDisplayName(target_ply)
@@ -164,11 +161,11 @@ function KrPoints.Points.ValidateAmount(amount)
 	
 	amount = tonumber(amount)
 	if not amount then
-		return false, "Invalid point amount"
+		return false, "Geçersiz puan miktarı"
 	end
 	
 	if amount < min or amount > max then
-		return false, "Point amount must be between " .. min .. " and " .. max
+		return false, "Puan miktarı " .. min .. " ve " .. max .. " arasında olmalıdır"
 	end
 	
 	return true, amount

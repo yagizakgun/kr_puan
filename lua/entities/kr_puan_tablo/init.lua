@@ -21,7 +21,6 @@ local function UpdateLeaderboard(ent)
                     local student = students[1]
                     local points = student.points or 0
                     
-                    -- Use display_name from query if available, otherwise lookup
                     if student.display_name and student.display_name ~= "" then
                         if IsValid(ent) and setter then
                             setter(ent, student.display_name .. " | " .. points)
@@ -46,7 +45,6 @@ local function UpdateLeaderboard(ent)
                     local student = students[1]
                     local points = student.points or 0
                     
-                    -- Use display_name from query if available, otherwise lookup
                     local display_name = (student.display_name and student.display_name ~= "") 
                         and student.display_name 
                         or KrPoints.GetDisplayNameFromIdentifier(student.id)
@@ -88,7 +86,7 @@ function ENT:OnRemove()
 end
 
 local UPDATE_DEBOUNCE_TIMER = "kr_puan_debounce_update"
-local DEBOUNCE_DELAY = 0.5  -- Wait 0.5 seconds before updating
+local DEBOUNCE_DELAY = 0.5
 
 function KrPoints.UpdateAllLeaderboards()
     if timer.Exists(UPDATE_DEBOUNCE_TIMER) then

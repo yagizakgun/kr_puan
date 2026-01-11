@@ -82,7 +82,6 @@ function SWEP:PrimaryAttack()
         local mode = self:GetGiveMode() and "ver" or "al"
         local points = self:GetSelectedPoints()
         
-        -- Server validates everything
         net.Start("KrPoints.GivePoints")
             net.WriteString(mode)
             net.WriteInt(points, 16)

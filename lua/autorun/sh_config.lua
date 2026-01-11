@@ -28,7 +28,7 @@ KrPoints.StudentFactions = {
 	-- Gryffindor öğrenci factionları
 	gryffindor = {
 		"Gryffindor Öğrencisi",
-		"Gryffindor Hane Başkanı",
+		-- "Gryffindor Hane Başkanı",
 		-- "Gryffindor Hane Başkan Yardımcısı"
 	},
 	

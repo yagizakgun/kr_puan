@@ -5,7 +5,6 @@ local VALID_HOUSES = KrPoints.Houses.VALID_HOUSES
 local VALID_HOUSES_LOOKUP = KrPoints.Houses.VALID_HOUSES_LOOKUP
 local DB_TYPE = KrPoints.DB.TYPE
 
--- Değişkenleri KrPoints tablosunda sakla ki birden fazla yüklemede kaybolmasın
 KrPoints.Database._MySQLConnection = KrPoints.Database._MySQLConnection or nil
 KrPoints.Database._IsMySQL = KrPoints.Database._IsMySQL or false
 KrPoints.Database._DatabaseReady = KrPoints.Database._DatabaseReady or false
@@ -52,7 +51,6 @@ local function ConnectMySQL()
 		return false
 	end
 	
-	-- Zaten bağlıysa tekrar bağlanma
 	local existingConn = GetMySQLConnection()
 	if existingConn and existingConn:status() == mysqloo.DATABASE_CONNECTED then
 		print("[KR-PUAN] [BİLGİ] MySQL zaten bağlı, yeniden bağlanma atlanıyor.")
@@ -134,7 +132,6 @@ end
 
 local function ExecuteQuery(query_str, callback, ...)
 	if GetIsMySQL() then
-		-- MySQL (async)
 		EnsureConnection(function(connected)
 			if not connected then
 				print("[KR-PUAN] [HATA] MySQL bağlı değil, sorgu başarısız oldu!")
@@ -164,7 +161,6 @@ local function ExecuteQuery(query_str, callback, ...)
 			query:start()
 		end)
 	else
-		-- SQLite (sync)
 		local result = sql.Query(query_str)
 		if result == false then
 			print("[KR-PUAN] [HATA] SQLite sorgu hatası: " .. tostring(sql.LastError()))
@@ -309,7 +305,6 @@ function KrPoints.Database.InitializeTables()
 				
 				ExecuteQuery("SHOW COLUMNS FROM " .. TABLE_NAME .. " LIKE 'display_name';", function(col_result)
 					if not col_result or #col_result == 0 then
-						-- Column doesn't exist, try to add it
 						local conn = GetMySQLConnection()
 						if conn then
 							local query = conn:query("ALTER TABLE " .. TABLE_NAME .. " ADD COLUMN display_name VARCHAR(128);")
@@ -317,7 +312,6 @@ function KrPoints.Database.InitializeTables()
 								print("[KR-PUAN] [BAŞARILI] display_name kolonu eklendi.")
 							end
 							function query:onError(err, sql)
-								-- Suppress duplicate column errors
 								if not string.find(err, "Duplicate column name") then
 									print("[KR-PUAN] [HATA] MySQL sorgu hatası: " .. tostring(err))
 									print("[KR-PUAN] [BİLGİ] Sorgu: " .. tostring(sql))
@@ -338,7 +332,6 @@ function KrPoints.Database.InitializeTables()
 				for _, idx in ipairs(indexes) do
 					ExecuteQuery("SHOW INDEX FROM " .. TABLE_NAME .. " WHERE Key_name = '" .. idx.name .. "';", function(idx_result)
 						if not idx_result or #idx_result == 0 then
-							-- Index doesn't exist, try to create it
 							local conn = GetMySQLConnection()
 							if conn then
 								local query = conn:query(idx.def)
@@ -346,7 +339,6 @@ function KrPoints.Database.InitializeTables()
 									print("[KR-PUAN] [BAŞARILI] İndeks oluşturuldu: " .. idx.name)
 								end
 								function query:onError(err, sql)
-									-- Suppress duplicate key errors (index already exists)
 									if not string.find(err, "Duplicate key name") then
 										print("[KR-PUAN] [HATA] MySQL sorgu hatası: " .. tostring(err))
 										print("[KR-PUAN] [BİLGİ] Sorgu: " .. tostring(sql))
@@ -358,7 +350,6 @@ function KrPoints.Database.InitializeTables()
 					end)
 				end
 				
-				-- Insert house records
 				for _, house in ipairs(VALID_HOUSES) do
 					local insert_query = "INSERT IGNORE INTO " .. TABLE_NAME .. " (entity_type, entity_id, points, updated_at) VALUES (?, ?, 0, ?);"
 					ExecutePreparedQuery(insert_query, nil, "house", house, Now())
@@ -373,7 +364,6 @@ function KrPoints.Database.InitializeTables()
 end
 
 function KrPoints.Database.Initialize()
-	-- Birden fazla kez çağrılmasını engelle
 	if KrPoints.Database._Initialized then
 		print("[KR-PUAN] [BİLGİ] Veritabanı zaten başlatılmış, atlanıyor...")
 		return
@@ -388,9 +378,6 @@ function KrPoints.Database.Initialize()
 			print("[KR-PUAN] [UYARI] MySQL bağlantısı başarısız oldu, SQLite'a geçiliyor...")
 			KrPoints.Database.InitializeSQLite()
 		end
-		-- MySQL async olduğundan burada SQLite başlatmıyoruz
-		-- Bağlantı başarılı olduğunda onConnected callback'i InitializeTables'ı çağıracak
-		-- Bağlantı başarısız olduğunda onConnectionFailed callback'i InitializeSQLite'ı çağıracak
 	else
 		KrPoints.Database.InitializeSQLite()
 	end

@@ -125,56 +125,6 @@ function KrPoints.Network.HandleGivePoints(len, ply)
 	end
 end
 
--- ===== CHAT COMMAND: !puan =====
-local function handle_points_command(ply, text)
-	text = text:lower()
-
-	if text:sub(1, 5) == "!puan" or text:sub(1, 5) == "/puan" then
-		if KrPoints.Permissions.IsProfessor(ply) then
-			local args = string.Explode(" ", text)
-
-			if #args ~= 3 then
-				ply:ChatPrint("Kullanım örneği: !puan gryffindor 10")
-				return ""
-			end
-
-			local target_house = args[2]
-			local point_amount = tonumber(args[3])
-
-			if not VALID_HOUSES_LOOKUP[target_house] then
-				ply:ChatPrint("Ev bulunamadı. Evler: gryffindor, hufflepuff, ravenclaw, slytherin")
-				return ""
-			end
-
-			if not point_amount then
-				ply:ChatPrint("Kullanım örneği: !puan gryffindor 10")
-				return ""
-			end
-
-			KrPoints.Points.AddToHouse(target_house, point_amount, function(new_points)
-				KrPoints.Network.BroadcastNotification(ply:Nick(), target_house, point_amount)
-
-				safe_notify_server(
-					ply:Nick() .. " [" .. ply:SteamID() .. "] isimli profesör " ..
-					string.upper(target_house) .. " evine " .. point_amount .. " puan verdi. " ..
-					string.upper(target_house) .. " evinin yeni puanı " .. new_points .. " oldu.",
-					point_amount > 0 and "green" or "red"
-				)
-				
-				if KrPoints.UpdateAllLeaderboards then
-					KrPoints.UpdateAllLeaderboards()
-				end
-			end)
-
-			return ""
-		else
-			KrPoints.Network.SyncToClient(ply)
-			return ""
-		end
-	end
-end
-hook.Add("PlayerSay", "KrPoints.Command", handle_points_command)
-
 local function handle_reset_command(ply, text)
 	text = text:lower()
 	if text:sub(1, 13) == "!tablosifirla" then

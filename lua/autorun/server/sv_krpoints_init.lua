@@ -4,12 +4,9 @@ hook.Add("Initialize", "KrPoints.System", function()
 	if initialized then return end
 	initialized = true
 	
-	-- Veritabanını başlat (MySQL veya SQLite)
 	KrPoints.Database.Initialize()
 	
-	-- MySQL async olduğundan, sync işlemleri biraz bekletmeliyiz
 	if KrPoints.DB.TYPE == "mysql" then
-		-- MySQL bağlantısı async, bir sonraki tick'te sync yapalım
 		timer.Simple(1, function()
 			if KrPoints.Database.IsReady() then
 				KrPoints.Points.SyncGlobalInts()
@@ -22,7 +19,6 @@ hook.Add("Initialize", "KrPoints.System", function()
 	KrPoints.Network.RegisterHandlers()
 end)
 
--- Hot-reload desteği için (harita değişiminde veya lua_run ile yeniden yüklendiğinde)
 timer.Simple(0.1, function()
 	if not initialized and KrPoints.Database and KrPoints.Database.Initialize then
 		initialized = true
