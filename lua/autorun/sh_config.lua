@@ -9,7 +9,9 @@ KrPoints.Purple = Color(255, 0, 255)
 KrPoints.Yellow = Color(201, 152, 18)
 KrPoints.Green = Color(11, 85, 11)
 
-KrPoints.HudDuration = 7
+KrPoints.ShowNotificationHud = true -- Enable/Disable notification HUD (true/false)
+KrPoints.NotificationDuration = 7 -- Notification duration in seconds
+
 
 -- Faction Names
 KrPoints.FactionRavenclaw = "Ravenclaw Öğrencisi"
@@ -24,7 +26,6 @@ KrPoints.LogoGryffindor = Material("rlib/interface/grunge/banners/hogwarts/em_gr
 KrPoints.LogoRavenclaw = Material("rlib/interface/grunge/banners/hogwarts/em_ra.png")
 
 -- ===== SHARED DATA =====
--- House list for iteration
 KrPoints.HouseList = {"Gryffindor", "Hufflepuff", "Ravenclaw", "Slytherin"}
 KrPoints.HouseKeys = {
 	Gryffindor = "gryffindor",
@@ -33,28 +34,6 @@ KrPoints.HouseKeys = {
 	Slytherin = "slytherin",
 }
 
--- PERFORMANCE FIX: Precache materials on client
-if CLIENT then
-	-- Precache house logos to prevent first-frame stutter
-	hook.Add("Initialize", "KrPoints.PrecacheMaterials", function()
-		-- Force load materials into cache
-		local materials_to_precache = {
-			KrPoints.LogoHufflepuff,
-			KrPoints.LogoSlytherin,
-			KrPoints.LogoGryffindor,
-			KrPoints.LogoRavenclaw,
-		}
-		
-		for _, mat in ipairs(materials_to_precache) do
-			if mat and not mat:IsError() then
-				-- Touch the material to ensure it's loaded
-				mat:GetTexture("$basetexture")
-			end
-		end
-		
-		print("[KR-PUAN] Materials precached successfully.")
-	end)
-end
 
 -- ===== SERVER-SIDE CONFIGURATION =====
 if SERVER then
@@ -94,10 +73,31 @@ if SERVER then
 		["yetkilisorumlusu"] = true,
 		["yonetimsefi"] = true,
 	}
+
+	resource.AddFile("resource/fonts/cinzel_decorative.ttf") 
+    resource.AddFile("resource/fonts/crimson_text.ttf")
+    resource.AddFile("resource/fonts/im_fell_english.ttf")
 end
 
--- ===== CLIENT-SIDE CONFIGURATION =====
 if CLIENT then
+	hook.Add("Initialize", "KrPoints.PrecacheMaterials", function()
+		local materials_to_precache = {
+			KrPoints.LogoHufflepuff,
+			KrPoints.LogoSlytherin,
+			KrPoints.LogoGryffindor,
+			KrPoints.LogoRavenclaw,
+		}
+		
+		for _, mat in ipairs(materials_to_precache) do
+			if mat and not mat:IsError() then
+				-- Touch the material to ensure it's loaded
+				mat:GetTexture("$basetexture")
+			end
+		end
+		
+		print("[KR-PUAN] Materials precached successfully.")
+	end)
+
 	-- HUD Position Settings (percentage of screen width/height)
 	KrPoints.HUD = KrPoints.HUD or {}
 	KrPoints.HUD.WeaponBoxX = 0.385      -- X position of weapon HUD box
@@ -130,10 +130,4 @@ if CLIENT then
 	KrPoints.HUD.BackgroundColorDark = Color(0, 0, 0, 220)
 	KrPoints.HUD.OrangeColor = Color(255, 128, 0)
 	KrPoints.HUD.PinkColor = Color(255, 0, 128)
-end
-
-if SERVER then
-    resource.AddFile("resource/fonts/cinzel_decorative.ttf") -- Dosya ismin neyse o
-    resource.AddFile("resource/fonts/crimson_text.ttf")
-    resource.AddFile("resource/fonts/im_fell_english.ttf")
 end
