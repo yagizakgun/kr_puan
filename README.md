@@ -247,15 +247,6 @@ KrPoints.ResetAllowedRanks = {
 }
 ```
 
-### Faction İsimleri
-
-```lua
-KrPoints.FactionRavenclaw = "Ravenclaw Öğrencisi"
-KrPoints.FactionGryffindor = "Gryffindor Öğrencisi"
-KrPoints.FactionSlytherin = "Slytherin Öğrencisi"
-KrPoints.FactionHufflepuff = "Hufflepuff Öğrencisi"
-```
-
 ## 🏆 Puan Tablosu Entity
 
 `kr_puan_tablo` entity'si spawn edilebilir bir 3D puan tablosudur:
