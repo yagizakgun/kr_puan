@@ -119,35 +119,36 @@ local function ModifyStudentPoints(professor_ply, target_ply, amount, is_giving,
 	-- Calculate new points (positive for give, negative for take)
 	local delta = is_giving and amount or -amount
 	
-	-- Get current points and update (async-safe)
-	KrPoints.Database.GetStudentPoints(student_id, function(current_student_points)
-		local new_student_points = current_student_points + delta
-		
-		-- Update student points (also store display_name for offline lookup)
-		KrPoints.Database.SetStudentPoints(student_id, new_student_points, student_house, function()
-			-- Update house points
-			KrPoints.Points.AddToHouse(student_house, delta, function(new_house_points)
-				-- Log the action
-				local action = is_giving and "gave" or "took"
-				local preposition = is_giving and "to" or "from"
-				print("[KR-PUAN] " .. professor_ply:Nick() .. " " .. action .. " " .. amount .. " points " .. preposition .. " " .. student_display_name .. " [ID:" .. student_id .. "] (" .. student_house .. ")")
-				
-				local result = {
-					student_name = student_display_name,
-					student_id = student_id,
-					student_house = student_house,
-					new_student_points = new_student_points,
-					new_house_points = new_house_points,
-					amount = amount
-				}
-				
-				if callback then callback(true, result) end
-			end)
-		end, student_display_name)
-	end)
-	
-	-- For sync compatibility (SQLite returns immediately)
-	if not KrPoints.Database.IsMySQL() then
+	-- Check if using MySQL or SQLite and handle accordingly
+	if KrPoints.Database.IsMySQL() then
+		-- MySQL: Use async callbacks
+		KrPoints.Database.GetStudentPoints(student_id, function(current_student_points)
+			local new_student_points = current_student_points + delta
+			
+			-- Update student points (also store display_name for offline lookup)
+			KrPoints.Database.SetStudentPoints(student_id, new_student_points, student_house, function()
+				-- Update house points
+				KrPoints.Points.AddToHouse(student_house, delta, function(new_house_points)
+					-- Log the action
+					local action = is_giving and "gave" or "took"
+					local preposition = is_giving and "to" or "from"
+					print("[KR-PUAN] " .. professor_ply:Nick() .. " " .. action .. " " .. amount .. " points " .. preposition .. " " .. student_display_name .. " [ID:" .. student_id .. "] (" .. student_house .. ")")
+					
+					local result = {
+						student_name = student_display_name,
+						student_id = student_id,
+						student_house = student_house,
+						new_student_points = new_student_points,
+						new_house_points = new_house_points,
+						amount = amount
+					}
+					
+					if callback then callback(true, result) end
+				end)
+			end, student_display_name)
+		end)
+	else
+		-- SQLite: Use synchronous calls (no callbacks to avoid double execution)
 		local current_student_points = KrPoints.Database.GetStudentPoints(student_id)
 		local new_student_points = current_student_points + delta
 		KrPoints.Database.SetStudentPoints(student_id, new_student_points, student_house, nil, student_display_name)
