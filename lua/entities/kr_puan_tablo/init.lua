@@ -6,30 +6,56 @@ include("shared.lua")
 local TIMER_PREFIX = "kr_puan_update_"
 local UPDATE_INTERVAL = 30
 
--- Retrieve top student data using KrPoints API
-local function GetTopStudentData(ent, house_name)
+-- Retrieve top student data using KrPoints API (async-safe)
+local function GetTopStudentData(ent, house_name, callback)
     local house_key = ent.HouseKeys[house_name]
-    if not house_key then return "Veri Yok | 0" end
-    
-    if not (KrPoints and KrPoints.Database) then return "Veri Yok | 0" end
-    
-    local students = KrPoints.Database.GetTopStudents(1, house_key)
-    if students and students[1] then
-        local student = students[1]
-        return (student.id or "Yok") .. " | " .. (student.points or 0)
+    if not house_key then 
+        if callback then callback("Veri Yok | 0") end
+        return "Veri Yok | 0"
     end
     
-    return "Veri Yok | 0"
+    if not (KrPoints and KrPoints.Database) then 
+        if callback then callback("Veri Yok | 0") end
+        return "Veri Yok | 0"
+    end
+    
+    KrPoints.Database.GetTopStudents(1, house_key, function(students)
+        if students and students[1] then
+            local student = students[1]
+            -- Use helper function to convert identifier to display name
+            local display_name = KrPoints.GetDisplayNameFromIdentifier(student.id)
+            local result = display_name .. " | " .. (student.points or 0)
+            if callback then callback(result) end
+        else
+            if callback then callback("Veri Yok | 0") end
+        end
+    end)
+    
+    -- For sync compatibility (SQLite)
+    if not (KrPoints.Database and KrPoints.Database.IsMySQL()) then
+        local students = KrPoints.Database.GetTopStudents(1, house_key)
+        if students and students[1] then
+            local student = students[1]
+            local display_name = KrPoints.GetDisplayNameFromIdentifier(student.id)
+            return display_name .. " | " .. (student.points or 0)
+        end
+        return "Veri Yok | 0"
+    end
 end
 
--- Update network variables for all houses
+-- Update network variables for all houses (async-safe)
 local function UpdateLeaderboard(ent)
     if not IsValid(ent) then return end
     
     for _, house in ipairs(ent.Houses) do
         local setter = ent["SetTopStudent" .. house]
         if setter then
-            setter(ent, GetTopStudentData(ent, house))
+            -- Use callback for async support
+            GetTopStudentData(ent, house, function(data)
+                if IsValid(ent) and setter then
+                    setter(ent, data)
+                end
+            end)
         end
     end
 end

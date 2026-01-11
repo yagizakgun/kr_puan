@@ -5,8 +5,12 @@ Hogwarts RP sunucuları için geliştirilmiş modern puan sistemi. Profesörler 
 ## 📋 Özellikler
 
 - ✅ Tek tablo ile modern veritabanı yapısı
+- ✅ **SQLite ve MySQL (MySQLOO 9) desteği**
+- ✅ Otomatik fallback sistemi (MySQL bağlantı hatası durumunda SQLite)
+- ✅ Async/sync query desteği
 - ✅ Profesör/öğrenci puan sistemi
 - ✅ 4 ev desteği (Gryffindor, Slytherin, Hufflepuff, Ravenclaw)
+- ✅ Multi-gamemode desteği (Helix, DarkRP, Others)
 - ✅ Rate limiting (spam koruması)
 - ✅ Yetki kontrolü (fx_d entegrasyonu veya ULX fallback)
 - ✅ Gerçek zamanlı GlobalInt senkronizasyonu
@@ -18,7 +22,8 @@ Hogwarts RP sunucuları için geliştirilmiş modern puan sistemi. Profesörler 
 fx_puan/
 ├── lua/
 │   ├── autorun/
-│   │   ├── sh_config.lua                    # Paylaşılan konfigürasyon + Utility API
+│   │   ├── sh_config.lua                    # Paylaşılan konfigürasyon
+│   │   ├── sh_krpoints_helpers.lua          # Helper fonksiyonlar (shared)
 │   │   ├── client/
 │   │   │   └── cl_puansistemi.lua           # Client HUD ve UI
 │   │   └── server/
@@ -42,19 +47,102 @@ fx_puan/
 └── README.md
 ```
 
+## 🗄️ Veritabanı Desteği
+
+KR-PUAN sistemi **SQLite** (varsayılan) ve **MySQL (MySQLOO 9)** veritabanlarını destekler.
+
+### Veritabanı Seçimi
+
+`lua/autorun/sh_config.lua` dosyasından veritabanı tipini seçebilirsiniz:
+
+```lua
+-- "sqlite" veya "mysql" seçeneklerinden birini seçin
+KrPoints.DatabaseType = "sqlite"  -- Varsayılan (kurulum gerektirmez)
+```
+
+### MySQL Kurulumu
+
+#### 1. MySQLOO 9 Modülü Kurulumu
+
+MySQLOO 9 binary dosyalarını indirin: [MySQLOO GitHub](https://github.com/FredyH/MySQLOO)
+
+- **Windows (64-bit):** `gmsv_mysqloo_win64.dll`
+- **Linux (64-bit):** `gmsv_mysqloo_linux64.dll`
+
+Binary dosyayı şu klasöre kopyalayın:
+```
+garrysmod/lua/bin/
+```
+
+#### 2. MySQL Bağlantı Ayarları
+
+`lua/autorun/sh_config.lua` dosyasında MySQL bağlantı bilgilerinizi girin:
+
+```lua
+-- Veritabanı tipini MySQL olarak ayarlayın
+KrPoints.DatabaseType = "mysql"
+
+-- MySQL bağlantı bilgileri
+KrPoints.MySQLHost = "localhost"        -- MySQL sunucu adresi
+KrPoints.MySQLPort = 3306               -- MySQL port
+KrPoints.MySQLDatabase = "gmod_krpuan"  -- Veritabanı adı
+KrPoints.MySQLUser = "root"             -- MySQL kullanıcı adı
+KrPoints.MySQLPassword = "your_password" -- MySQL şifresi
+```
+
+#### 3. MySQL Veritabanı Oluşturma
+
+MySQL sunucunuzda veritabanını oluşturun:
+
+```sql
+CREATE DATABASE IF NOT EXISTS gmod_krpuan 
+  DEFAULT CHARACTER SET utf8mb4 
+  COLLATE utf8mb4_unicode_ci;
+```
+
+> **Not:** Tablo otomatik olarak addon tarafından oluşturulur, manuel tablo oluşturmanıza gerek yoktur!
+
+### Otomatik Fallback
+
+Eğer MySQLOO 9 yüklü değilse veya MySQL bağlantısı başarısız olursa, sistem otomatik olarak SQLite'a geçer ve konsola bilgilendirme mesajı yazdırır:
+
+```
+[KR-PUAN] WARNING: MySQLOO module not found! Falling back to SQLite.
+```
+
+veya
+
+```
+[KR-PUAN] ERROR: MySQL connection failed: [error message]
+[KR-PUAN] Falling back to SQLite...
+```
+
 ## 🗄️ Veritabanı Şeması
 
 Tek tablo ile tüm veriler yönetilir:
 
+**SQLite:**
 ```sql
 kr_points (
   entity_type TEXT,     -- 'house' veya 'student'
-  entity_id TEXT,       -- ev adı veya öğrenci adı
+  entity_id TEXT,       -- ev adı veya öğrenci tanımlayıcı
   points INTEGER,       -- puan değeri
   house TEXT,           -- öğrencinin evi (sadece student için)
   updated_at INTEGER,   -- son güncelleme timestamp
   PRIMARY KEY (entity_type, entity_id)
 )
+```
+
+**MySQL:**
+```sql
+kr_points (
+  entity_type VARCHAR(32),   -- 'house' veya 'student'
+  entity_id VARCHAR(128),    -- ev adı veya öğrenci tanımlayıcı
+  points INT DEFAULT 0,      -- puan değeri
+  house VARCHAR(32),         -- öğrencinin evi (sadece student için)
+  updated_at INT,            -- son güncelleme timestamp
+  PRIMARY KEY (entity_type, entity_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
 **Örnek Veriler:**
@@ -63,34 +151,130 @@ kr_points (
 |-------------|-----------|--------|-------|------------|
 | house | gryffindor | 150 | NULL | 1736582400 |
 | house | slytherin | 120 | NULL | 1736582400 |
-| student | Harry Potter | 25 | gryffindor | 1736583000 |
-| student | Draco Malfoy | 15 | slytherin | 1736583100 |
+| student | 12345 | 25 | gryffindor | 1736583000 |
+| student | Harry Potter | 15 | slytherin | 1736583100 |
+
+> **Not:** `entity_id` gamemode'a göre değişir:
+> - **Helix:** Character ID (örn: `12345`)
+> - **DarkRP/Others:** Player Nick (örn: `Harry Potter`)
 
 ## 🔧 API Kullanımı
 
+> **Önemli:** MySQL kullanırken tüm database fonksiyonları async (callback tabanlı) çalışır. SQLite kullanırken ise sync çalışır.
+
 ### Ev Puanları
 
+**SQLite (Sync):**
 ```lua
--- Tüm evlerin puanlarını çek (sıralı)
-local houses = KrPoints.Database.GetAllHousePoints()
--- Dönen: { {house = "gryffindor", points = 150}, ... }
-
 -- Tek evin puanını çek
 local points = KrPoints.Database.GetHousePoints("gryffindor")
 
 -- Eve puan ekle/çıkar (atomic)
 local new_points = KrPoints.Database.AddHousePoints("gryffindor", 10)
-local new_points = KrPoints.Database.AddHousePoints("gryffindor", -5)
 
 -- Ev puanını direkt ayarla
 KrPoints.Database.SetHousePoints("gryffindor", 200)
+
+-- Tüm evlerin puanlarını çek (sıralı)
+local houses = KrPoints.Database.GetAllHousePoints()
+-- Dönen: { {house = "gryffindor", points = 150}, ... }
+```
+
+**MySQL (Async - Callback):**
+```lua
+-- Tek evin puanını çek
+KrPoints.Database.GetHousePoints("gryffindor", function(points)
+    print("Gryffindor points: " .. points)
+end)
+
+-- Eve puan ekle/çıkar
+KrPoints.Database.AddHousePoints("gryffindor", 10, function(new_points)
+    print("New points: " .. new_points)
+end)
+
+-- Ev puanını direkt ayarla
+KrPoints.Database.SetHousePoints("gryffindor", 200, function(success)
+    if success then
+        print("Points updated!")
+    end
+end)
+
+-- Tüm evlerin puanlarını çek
+KrPoints.Database.GetAllHousePoints(function(houses)
+    for _, house_data in ipairs(houses) do
+        print(house_data.house .. ": " .. house_data.points)
+    end
+end)
 ```
 
 ### Öğrenci Puanları
 
+**SQLite (Sync):**
 ```lua
 -- Öğrencinin puanını çek
 local points = KrPoints.Database.GetStudentPoints("Harry Potter")
+
+-- Öğrencinin evini çek
+local house = KrPoints.Database.GetStudentHouse("Harry Potter")
+
+-- Öğrenci puanı ayarla
+KrPoints.Database.SetStudentPoints("Harry Potter", 50, "gryffindor")
+
+-- En yüksek puanlı öğrencileri çek (tüm evlerden)
+local top_students = KrPoints.Database.GetTopStudents(10)
+
+-- Belirli bir evden en yüksek puanlı öğrencileri çek
+local top_gryffindor = KrPoints.Database.GetTopStudents(5, "gryffindor")
+```
+
+**MySQL (Async - Callback):**
+```lua
+-- Öğrencinin puanını çek
+KrPoints.Database.GetStudentPoints("Harry Potter", function(points)
+    print("Student points: " .. points)
+end)
+
+-- Öğrencinin evini çek
+KrPoints.Database.GetStudentHouse("Harry Potter", function(house)
+    print("Student house: " .. house)
+end)
+
+-- Öğrenci puanı ayarla
+KrPoints.Database.SetStudentPoints("Harry Potter", 50, "gryffindor", function(success)
+    if success then
+        print("Student points updated!")
+    end
+end)
+
+-- En yüksek puanlı öğrencileri çek
+KrPoints.Database.GetTopStudents(10, nil, function(students)
+    for _, student in ipairs(students) do
+        print(student.id .. ": " .. student.points .. " (" .. student.house .. ")")
+    end
+end)
+
+-- Belirli bir evden en yüksek puanlı öğrencileri çek
+KrPoints.Database.GetTopStudents(5, "gryffindor", function(students)
+    for _, student in ipairs(students) do
+        print(student.id .. ": " .. student.points)
+    end
+end)
+```
+
+### Utility Fonksiyonlar
+
+```lua
+-- Hangi veritabanı kullanıldığını kontrol et
+if KrPoints.Database.IsMySQL() then
+    print("Using MySQL")
+else
+    print("Using SQLite")
+end
+
+-- Veritabanı hazır mı?
+if KrPoints.Database.IsReady() then
+    print("Database is ready")
+end
 
 -- Öğrencinin evini çek
 local house = KrPoints.Database.GetStudentHouse("Harry Potter")
@@ -136,7 +320,9 @@ KrPoints.Database.ResetHouses()
 KrPoints.Database.ResetStudents()
 ```
 
-### Shared Utility Fonksiyonları (Client & Server)
+### Shared Helper Fonksiyonları (Client & Server)
+
+#### Ev Puanları Helpers
 
 ```lua
 -- Tüm ev puanlarını al (GlobalInt üzerinden)
@@ -156,6 +342,23 @@ KrPoints.HouseList  -- {"Gryffindor", "Hufflepuff", "Ravenclaw", "Slytherin"}
 KrPoints.HouseKeys  -- {Gryffindor = "gryffindor", Hufflepuff = "hufflepuff", ...}
 ```
 
+#### Oyuncu Tanımlayıcı Helpers
+
+```lua
+-- Oyuncu için benzersiz tanımlayıcı al (database için)
+local identifier = KrPoints.GetStudentIdentifier(ply)
+-- Helix: Character ID (örn: "12345")
+-- DarkRP/Others: Player Nick (örn: "Harry Potter")
+
+-- Oyuncu için görünen isim al (UI/log için)
+local displayName = KrPoints.GetStudentDisplayName(ply)
+-- Helix: Character Name (örn: "Harry Potter")
+-- DarkRP/Others: Player Nick (örn: "Harry Potter")
+
+-- Aktif gamemode'u öğren
+print(KrPoints.Gamemode)  -- "helix", "darkrp", veya "others"
+```
+
 ### Client-Side Erişim (GlobalInt - Low Level)
 
 ```lua
@@ -169,6 +372,21 @@ local ravenclaw = GetGlobalInt("puan_ravenclaw", 0)
 ## ⚙️ Konfigürasyon
 
 `lua/autorun/sh_config.lua` dosyasından ayarları değiştirebilirsiniz:
+
+### Gamemode Ayarları
+
+```lua
+-- Kullanılan gamemode'u belirtin
+KrPoints.UsingGamemode = "helix"  -- "helix", "darkrp", veya "others"
+```
+
+| Gamemode | entity_id (Database) | Display Name (UI/Log) |
+|----------|---------------------|----------------------|
+| `"helix"` | Character ID | Character Name |
+| `"darkrp"` | Player Nick | Player Nick |
+| `"others"` | Player Nick | Player Nick |
+
+> **Önemli:** Helix kullanıyorsanız, oyuncular karakter değiştirdiğinde puanlar karakter ID'sine bağlı olduğu için korunur.
 
 ### Güvenlik Ayarları
 
@@ -256,8 +474,10 @@ end)
 hook.Add("PlayerCompletedQuest", "QuestPoints", function(ply, quest)
     local house = KrPoints.Points.GetStudentHouse(ply)
     if house then
-        local current = KrPoints.Database.GetStudentPoints(ply:Nick())
-        KrPoints.Database.SetStudentPoints(ply:Nick(), current + 2, house)
+        -- Gamemode-agnostic identifier kullan
+        local identifier = KrPoints.GetStudentIdentifier(ply)
+        local current = KrPoints.Database.GetStudentPoints(identifier)
+        KrPoints.Database.SetStudentPoints(identifier, current + 2, house)
         KrPoints.Database.AddHousePoints(house, 2)
         KrPoints.Points.SyncGlobalInts(house)
         ply:ChatPrint("Quest tamamlandı! +2 puan kazandınız.")
@@ -291,9 +511,20 @@ end)
 
 ## 📦 Bağımlılıklar
 
-- **Helix Framework** (ix.faction için)
+### Gamemode Bağımlılıkları
+
+| Gamemode | Bağımlılık | Açıklama |
+|----------|-----------|----------|
+| Helix | **Helix Framework** | `ix.faction`, `ply:GetCharacter()` için gerekli |
+| DarkRP | Yok | Vanilla GMod fonksiyonları kullanılır |
+| Others | Yok | Vanilla GMod fonksiyonları kullanılır |
+
+### Opsiyonel Bağımlılıklar
+
 - **fx_d** (opsiyonel - profesör tespiti için)
 - **ULX/ULib** (opsiyonel - fallback yetki sistemi)
 
-**Geliştirici:** Kronax
-**Versiyon:** 2.0 (Modern Database)
+---
+
+**Geliştirici:** Kronax  
+**Versiyon:** 2.1 (Multi-Gamemode Support)

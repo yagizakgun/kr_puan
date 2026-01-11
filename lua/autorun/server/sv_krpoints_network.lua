@@ -109,29 +109,41 @@ function KrPoints.Network.HandleGivePoints(len, ply)
 		return
 	end
 
-	-- Execute the point operation
-	local success, result
+	-- Execute the point operation (with async callback support)
+	local function HandleResult(success, result)
+		if not success then
+			print("[KR-PUAN] HATA: " .. tostring(result))
+			if IsValid(ply) then
+				ply:ChatPrint("[PUAN] HATA: " .. tostring(result))
+			end
+			return
+		end
+
+		-- Broadcast the update to all clients
+		KrPoints.Network.BroadcastPointUpdate(
+			point_mode,
+			ply:Nick(),
+			result.student_house,
+			result.student_name,
+			points_to_give
+		)
+	end
+	
 	if point_mode == "ver" then
-		success, result = KrPoints.Points.Give(ply, winner_entity, points_to_give)
+		if KrPoints.Database.IsMySQL() then
+			KrPoints.Points.Give(ply, winner_entity, points_to_give, HandleResult)
+		else
+			local success, result = KrPoints.Points.Give(ply, winner_entity, points_to_give)
+			HandleResult(success, result)
+		end
 	elseif point_mode == "al" then
-		success, result = KrPoints.Points.Take(ply, winner_entity, points_to_give)
+		if KrPoints.Database.IsMySQL() then
+			KrPoints.Points.Take(ply, winner_entity, points_to_give, HandleResult)
+		else
+			local success, result = KrPoints.Points.Take(ply, winner_entity, points_to_give)
+			HandleResult(success, result)
+		end
 	end
-
-	-- Handle result
-	if not success then
-		print("[KR-PUAN] HATA: " .. tostring(result))
-		ply:ChatPrint("[PUAN] HATA: " .. tostring(result))
-		return
-	end
-
-	-- Broadcast the update to all clients
-	KrPoints.Network.BroadcastPointUpdate(
-		point_mode,
-		ply:Nick(),
-		result.student_house,
-		result.student_name,
-		points_to_give
-	)
 end
 
 -- ===== CHAT COMMAND: !puan =====
@@ -160,17 +172,18 @@ local function handle_points_command(ply, text)
 				return ""
 			end
 
-			local new_points = KrPoints.Points.AddToHouse(target_house, point_amount)
+			-- Add points with callback support
+			KrPoints.Points.AddToHouse(target_house, point_amount, function(new_points)
+				-- Broadcast notification
+				KrPoints.Network.BroadcastNotification(ply:Nick(), target_house, point_amount)
 
-			-- Broadcast notification
-			KrPoints.Network.BroadcastNotification(ply:Nick(), target_house, point_amount)
-
-			safe_notify_server(
-				ply:Nick() .. " [" .. ply:SteamID() .. "] isimli profesör " ..
-				string.upper(target_house) .. " evine " .. point_amount .. " puan verdi. " ..
-				string.upper(target_house) .. " evinin yeni puanı " .. new_points .. " oldu.",
-				point_amount > 0 and "green" or "red"
-			)
+				safe_notify_server(
+					ply:Nick() .. " [" .. ply:SteamID() .. "] isimli profesör " ..
+					string.upper(target_house) .. " evine " .. point_amount .. " puan verdi. " ..
+					string.upper(target_house) .. " evinin yeni puanı " .. new_points .. " oldu.",
+					point_amount > 0 and "green" or "red"
+				)
+			end)
 
 			return ""
 		else
@@ -187,9 +200,14 @@ local function handle_reset_command(ply, text)
 	text = text:lower()
 	if text:sub(1, 13) == "!tablosifirla" then
 		if KrPoints.Permissions.CanResetPoints(ply) then
-			KrPoints.Database.ResetAll()
-			KrPoints.Points.SyncGlobalInts() -- Update all globals after reset
-			ply:ChatPrint("[PUAN] Başarıyla tüm tablo puanlarını sıfırladınız.")
+			KrPoints.Database.ResetAll(function(success)
+				if success then
+					KrPoints.Points.SyncGlobalInts() -- Update all globals after reset
+					if IsValid(ply) then
+						ply:ChatPrint("[PUAN] Başarıyla tüm tablo puanlarını sıfırladınız.")
+					end
+				end
+			end)
 		else
 			ply:ChatPrint("[PUAN] Bu komutu kullanmak için yetkiniz yok.")
 		end

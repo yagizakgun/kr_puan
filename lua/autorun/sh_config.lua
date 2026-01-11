@@ -23,7 +23,7 @@ KrPoints.LogoSlytherin = Material("rlib/interface/grunge/banners/hogwarts/em_sl.
 KrPoints.LogoGryffindor = Material("rlib/interface/grunge/banners/hogwarts/em_gr.png")
 KrPoints.LogoRavenclaw = Material("rlib/interface/grunge/banners/hogwarts/em_ra.png")
 
--- ===== SHARED UTILITY FUNCTIONS =====
+-- ===== SHARED DATA =====
 -- House list for iteration
 KrPoints.HouseList = {"Gryffindor", "Hufflepuff", "Ravenclaw", "Slytherin"}
 KrPoints.HouseKeys = {
@@ -32,39 +32,6 @@ KrPoints.HouseKeys = {
 	Ravenclaw = "ravenclaw",
 	Slytherin = "slytherin",
 }
-
--- Get all house points from GlobalInts (works on both client and server)
-function KrPoints.GetAllHousePoints()
-	local points = {}
-	for _, house in ipairs(KrPoints.HouseList) do
-		local key = KrPoints.HouseKeys[house]
-		points[house] = GetGlobalInt("puan_" .. key, 0)
-	end
-	return points
-end
-
--- Get the leading house and its score
--- Returns: house_name (string), max_score (number)
-function KrPoints.GetLeadingHouse()
-	local points = KrPoints.GetAllHousePoints()
-	local leadingHouse, maxScore = nil, 0
-	
-	for house, score in pairs(points) do
-		if score > maxScore then
-			maxScore = score
-			leadingHouse = house
-		end
-	end
-	
-	return leadingHouse or "Gryffindor", maxScore
-end
-
--- Get points for a specific house
-function KrPoints.GetHousePoints(house)
-	local key = KrPoints.HouseKeys[house]
-	if not key then return 0 end
-	return GetGlobalInt("puan_" .. key, 0)
-end
 
 -- PERFORMANCE FIX: Precache materials on client
 if CLIENT then
@@ -100,8 +67,24 @@ if SERVER then
 	-- Professor Fallback Security
 	KrPoints.ProfessorFallbackRequireAdmin = true  -- If fx_d system not found, require superadmin (true) or allow all admins (false)
 	
+	-- Gamemode Settings
+	KrPoints.UsingGamemode = "helix"         -- "helix", "darkrp", "others"
+	
 	-- Database Settings
 	KrPoints.TableName = "kr_points"
+	
+	-- ===== DATABASE TYPE CONFIGURATION =====
+	-- Choose your database system: "sqlite" or "mysql"
+	KrPoints.DatabaseType = "sqlite"         -- "sqlite" (default, no setup needed) or "mysql" (requires MySQLOO 9)
+	
+	-- ===== MYSQL CONFIGURATION =====
+	-- Only used if DatabaseType = "mysql"
+	-- MySQLOO 9 is required: https://github.com/FredyH/MySQLOO
+	KrPoints.MySQLHost = "localhost"         -- MySQL server host
+	KrPoints.MySQLPort = 3306                -- MySQL server port
+	KrPoints.MySQLDatabase = "gmod_krpuan"   -- Database name
+	KrPoints.MySQLUser = "root"              -- MySQL username
+	KrPoints.MySQLPassword = ""              -- MySQL password
 	
 	-- Reset Command Allowed Ranks
 	KrPoints.ResetAllowedRanks = {

@@ -11,6 +11,12 @@ KrPoints = KrPoints or {}
 -- ===== DATABASE CONFIGURATION =====
 KrPoints.DB = KrPoints.DB or {}
 KrPoints.DB.TABLE_NAME = KrPoints.TableName or "kr_points"
+KrPoints.DB.TYPE = KrPoints.DatabaseType or "sqlite"
+KrPoints.DB.MYSQL_HOST = KrPoints.MySQLHost or "localhost"
+KrPoints.DB.MYSQL_PORT = KrPoints.MySQLPort or 3306
+KrPoints.DB.MYSQL_DATABASE = KrPoints.MySQLDatabase or "gmod_krpuan"
+KrPoints.DB.MYSQL_USER = KrPoints.MySQLUser or "root"
+KrPoints.DB.MYSQL_PASSWORD = KrPoints.MySQLPassword or ""
 
 -- ===== SECURITY CONFIGURATION =====
 KrPoints.Security = KrPoints.Security or {}
